@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { FileText, Users, Package, FileCheck, History } from 'lucide-react';
+import { CheckCircle, Users, Package, FileCheck, History } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Navbar() {
@@ -14,14 +14,17 @@ export default function Navbar() {
 
   return (
     <nav className="bg-white shadow-md">
-      <div className="container mx-auto px-6">
-        <div className="flex items-center justify-between h-16">
+      <div className="container mx-auto px-2 sm:px-6">
+        <div className="flex items-center justify-between h-12 sm:h-16">
           <div className="flex items-center space-x-2">
-            <FileText className="w-8 h-8 text-blue-600" />
-            <span className="text-xl font-bold text-gray-800">QuoteGen</span>
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-cravora-purple rounded-full flex items-center justify-center">
+              <CheckCircle className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
+            </div>
+            <span className="text-lg sm:text-xl font-bold text-cravora-purple">CRAVORA</span>
           </div>
 
-          <div className="flex space-x-1">
+          {/* Desktop Navigation - Hidden on mobile */}
+          <div className="hidden sm:flex space-x-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -33,7 +36,7 @@ export default function Navbar() {
                     whileTap={{ scale: 0.95 }}
                     className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
                       isActive
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-cravora-purple text-white'
                         : 'text-gray-600 hover:bg-gray-100'
                     }`}
                   >
@@ -43,6 +46,13 @@ export default function Navbar() {
                 </Link>
               );
             })}
+          </div>
+
+          {/* Mobile - Show current page indicator only */}
+          <div className="sm:hidden">
+            <div className="text-sm font-medium text-cravora-purple">
+              {navItems.find(item => item.path === location.pathname)?.label || 'Client'}
+            </div>
           </div>
         </div>
       </div>
