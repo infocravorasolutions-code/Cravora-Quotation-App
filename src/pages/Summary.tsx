@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, FileText, Save } from 'lucide-react';
+import { ArrowLeft, FileText, Save, Plus, Trash2 } from 'lucide-react';
 import { useQuotationStore } from '../store/quotationStore';
 import { formatCurrency, convertUSDToINR } from '../utils/currency';
 import ProgressStepper from '../components/ProgressStepper';
@@ -13,24 +13,28 @@ export default function Summary() {
   const {
     clientInfo,
     modules,
-    tax,
     gstDetails,
-    setTax,
+    discountRate,
+    setDiscountRate,
     updateGstAmounts,
     getSubtotal,
-    getTaxAmount,
+    getDiscountAmount,
     getGstAmount,
     getGrandTotal,
     saveDraft,
+    termsAndConditions,
+    setTermsAndConditions,
+    documentType,
+    setDocumentType,
   } = useQuotationStore();
-  
+
   // Auto-save functionality
   useAutoSave(30000); // Auto-save every 30 seconds
 
   // Update GST amounts when modules or GST details change
   useEffect(() => {
     updateGstAmounts();
-  }, [modules, gstDetails.gstRate, gstDetails.gstType, updateGstAmounts]);
+  }, [modules, gstDetails.gstRate, gstDetails.gstType, discountRate, updateGstAmounts]);
 
   const [inrEquivalent, setInrEquivalent] = useState<number | null>(null);
 
@@ -45,7 +49,6 @@ export default function Summary() {
   }, [clientInfo.currency, getGrandTotal]);
 
   const subtotal = getSubtotal();
-  const taxAmount = getTaxAmount();
   const gstAmount = getGstAmount();
   const grandTotal = getGrandTotal();
 
@@ -68,7 +71,7 @@ export default function Summary() {
           <div className="mb-6 sm:mb-8">
             <ProgressStepper currentStep={3} />
           </div>
-          
+
           <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-2 sm:p-6 lg:p-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
               <div>
@@ -157,27 +160,27 @@ export default function Summary() {
                     ) : (
                       modules.map((module) => (
                         <tr key={module.id} className="border-b border-gray-100">
-                        <td className="py-2 sm:py-3 px-2 sm:px-4">
-                          <div>
-                            <div className="font-medium text-gray-800 text-xs sm:text-sm">
-                              {module.name}
-                            </div>
-                            {module.description && (
-                              <div className="text-xs sm:text-sm text-gray-500">
-                                {module.description}
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            <div>
+                              <div className="font-medium text-gray-800 text-xs sm:text-sm">
+                                {module.name}
                               </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="text-right py-2 sm:py-3 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm">
-                          {module.hours}
-                        </td>
-                        <td className="text-right py-2 sm:py-3 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm">
-                          {formatCurrency(module.rate, clientInfo.currency)}
-                        </td>
-                        <td className="text-right py-2 sm:py-3 px-2 sm:px-4 font-medium text-gray-800 text-xs sm:text-sm">
-                          {formatCurrency(module.total, clientInfo.currency)}
-                        </td>
+                              {module.description && (
+                                <div className="text-xs sm:text-sm text-gray-500">
+                                  {module.description}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="text-right py-2 sm:py-3 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm">
+                            {module.hours}
+                          </td>
+                          <td className="text-right py-2 sm:py-3 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm">
+                            {formatCurrency(module.rate, clientInfo.currency)}
+                          </td>
+                          <td className="text-right py-2 sm:py-3 px-2 sm:px-4 font-medium text-gray-800 text-xs sm:text-sm">
+                            {formatCurrency(module.total, clientInfo.currency)}
+                          </td>
                         </tr>
                       ))
                     )}
@@ -186,9 +189,79 @@ export default function Summary() {
               </div>
             </div>
 
+            {/* Document Type Selection */}
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Document Type</h2>
+              <div className="flex gap-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={documentType === 'Quotation'}
+                    onChange={() => setDocumentType('Quotation')}
+                    className="w-4 h-4 text-cravora-purple focus:ring-cravora-purple border-gray-300"
+                  />
+                  <span className="text-gray-700 font-medium">Quotation</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={documentType === 'Billing'}
+                    onChange={() => setDocumentType('Billing')}
+                    className="w-4 h-4 text-cravora-purple focus:ring-cravora-purple border-gray-300"
+                  />
+                  <span className="text-gray-700 font-medium">Billing</span>
+                </label>
+              </div>
+            </div>
+
             {/* GST Configuration */}
             <div className="mb-8">
               <GSTConfiguration />
+            </div>
+
+            {/* Editable Terms & Conditions */}
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-800">Terms and Conditions</h2>
+                <button
+                  onClick={() => setTermsAndConditions([...termsAndConditions, ''])}
+                  className="flex items-center space-x-1 text-sm text-cravora-purple hover:text-cravora-purple-dark font-medium"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Term</span>
+                </button>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4 sm:p-6 space-y-3">
+                {termsAndConditions.length === 0 ? (
+                  <p className="text-gray-500 text-sm text-center">No Terms & Conditions specified.</p>
+                ) : (
+                  termsAndConditions.map((term, index) => (
+                    <div key={index} className="flex items-start space-x-3">
+                      <span className="text-gray-500 mt-2 font-medium">{index + 1}.</span>
+                      <textarea
+                        value={term}
+                        onChange={(e) => {
+                          const newTerms = [...termsAndConditions];
+                          newTerms[index] = e.target.value;
+                          setTermsAndConditions(newTerms);
+                        }}
+                        className="flex-1 min-h-[40px] px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-cravora-purple focus:border-transparent resize-y"
+                        placeholder="Enter term details..."
+                      />
+                      <button
+                        onClick={() => {
+                          const newTerms = termsAndConditions.filter((_, i) => i !== index);
+                          setTermsAndConditions(newTerms);
+                        }}
+                        className="p-2 text-gray-400 hover:text-red-500 transition-colors rounded hover:bg-red-50"
+                        title="Remove term"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
 
             <div className="mb-8">
@@ -200,6 +273,23 @@ export default function Summary() {
                   <span className="text-gray-700">Subtotal</span>
                   <span className="font-medium text-gray-800">
                     {formatCurrency(subtotal, clientInfo.currency)}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-700">Discount (%)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={discountRate}
+                      onChange={(e) => setDiscountRate(Number(e.target.value))}
+                      className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-cravora-purple focus:border-transparent text-sm"
+                    />
+                  </div>
+                  <span className="font-medium text-green-600">
+                    -{formatCurrency(getDiscountAmount(), clientInfo.currency)}
                   </span>
                 </div>
 
@@ -227,7 +317,7 @@ export default function Summary() {
                     </span>
                   </div>
                 )}
-                
+
                 <div className="flex justify-between items-center border-t pt-2">
                   <span className="text-gray-700 font-semibold">Total GST</span>
                   <span className="font-semibold text-gray-800">

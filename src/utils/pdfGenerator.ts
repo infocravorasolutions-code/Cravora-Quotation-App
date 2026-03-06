@@ -9,8 +9,8 @@ export interface PDFOptions {
 }
 
 export async function generatePDF(
-  elementId: string, 
-  filename: string, 
+  elementId: string,
+  filename: string,
   options: PDFOptions = {}
 ) {
   const element = document.getElementById(elementId);
@@ -44,6 +44,9 @@ export async function generatePDF(
     element.style.position = 'static';
   }
 
+  // Ensure fonts are fully loaded before rendering
+  await document.fonts.ready;
+
   const canvas = await html2canvas(element, {
     scale: settings.scale,
     useCORS: true,
@@ -59,8 +62,12 @@ export async function generatePDF(
       console.log('Cloned document:', clonedDoc);
       const clonedElement = clonedDoc.getElementById(elementId);
       if (clonedElement) {
+        // Strip margins that cause slice mismatches during mult-page rendering
+        Array.from(clonedElement.children).forEach((child: any) => {
+          child.style.marginBottom = '0px';
+          child.style.boxShadow = 'none';
+        });
         console.log('Cloned element found:', clonedElement);
-        console.log('Cloned element content:', clonedElement.innerHTML.substring(0, 200));
       }
     }
   });
@@ -90,7 +97,8 @@ export async function generatePDF(
   pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
   heightLeft -= pageHeight;
 
-  while (heightLeft >= 0) {
+  // Ignore less than 20mm of remaining trailing height to fiercely prevent floating-point rounding errors or minor padding from triggering a blank tail page
+  while (heightLeft > 20) {
     position = heightLeft - imgHeight;
     pdf.addPage();
     pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
@@ -117,7 +125,7 @@ export async function generateEnhancedPDF(
   template: 'modern' | 'classic' | 'minimal' = 'modern'
 ) {
   const pdf = new jsPDF('p', 'mm', 'a4');
-  
+
   // Set up fonts and colors based on template
   const templateStyles = {
     modern: {
@@ -141,82 +149,82 @@ export async function generateEnhancedPDF(
   };
 
   const styles = templateStyles[template];
-  
+
   // Header
   pdf.setFillColor(styles.primaryColor[0], styles.primaryColor[1], styles.primaryColor[2]);
   pdf.rect(0, 0, 210, 30, 'F');
-  
+
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(24);
   pdf.setFont(styles.headerFont, 'bold');
   pdf.text('Cravora Solutions', 20, 20);
-  
+
   pdf.setFontSize(10);
   pdf.setFont(styles.headerFont, 'normal');
   pdf.text('Professional Quotation System', 20, 25);
-  
+
   // Quotation ID and Date
   pdf.text(`Quotation: ${data.quotationId}`, 150, 15);
   pdf.text(`Date: ${new Date().toLocaleDateString()}`, 150, 20);
-  
+
   // Reset colors
   pdf.setTextColor(styles.secondaryColor[0], styles.secondaryColor[1], styles.secondaryColor[2]);
-  
+
   // Client Information
   let yPosition = 50;
   pdf.setFontSize(14);
   pdf.setFont(styles.bodyFont, 'bold');
   pdf.text('Bill To:', 20, yPosition);
-  
+
   yPosition += 10;
   pdf.setFontSize(12);
   pdf.setFont(styles.bodyFont, 'normal');
   pdf.text(data.clientInfo.clientName, 20, yPosition);
   pdf.text(data.clientInfo.clientEmail, 20, yPosition + 5);
-  
+
   // Project Details
   pdf.setFont(styles.bodyFont, 'bold');
   pdf.text('Project:', 110, yPosition);
   pdf.setFont(styles.bodyFont, 'normal');
   pdf.text(data.clientInfo.projectName, 110, yPosition + 5);
-  
+
   // Modules Table
   yPosition += 30;
   pdf.setFont(styles.bodyFont, 'bold');
   pdf.setFontSize(12);
   pdf.text('Modules & Services', 20, yPosition);
-  
+
   yPosition += 10;
-  
+
   // Table headers
   pdf.setFillColor(240, 240, 240);
   pdf.rect(20, yPosition - 5, 170, 8, 'F');
-  
+
   pdf.setFontSize(10);
   pdf.setFont(styles.bodyFont, 'bold');
   pdf.text('Description', 22, yPosition);
   pdf.text('Hours', 120, yPosition);
   pdf.text('Rate', 140, yPosition);
   pdf.text('Amount', 170, yPosition);
-  
+
   yPosition += 8;
-  
+
   // Table rows
   data.modules.forEach((module: any) => {
     if (yPosition > 250) {
       pdf.addPage();
       yPosition = 20;
     }
-    
+
     pdf.setFont(styles.bodyFont, 'normal');
     pdf.text(module.name, 22, yPosition);
     pdf.text(module.hours.toString(), 120, yPosition);
     pdf.text(formatCurrency(module.rate, data.clientInfo.currency), 140, yPosition);
     pdf.text(formatCurrency(module.total, data.clientInfo.currency), 170, yPosition);
-    
+
     yPosition += 6;
   });
-  
+
   // Totals
   yPosition += 10;
   pdf.setFont(styles.bodyFont, 'bold');
@@ -224,7 +232,7 @@ export async function generateEnhancedPDF(
   pdf.text(`Buffer (${data.buffer}%): ${formatCurrency(data.bufferAmount, data.clientInfo.currency)}`, 120, yPosition + 5);
   pdf.text(`Tax (${data.tax}%): ${formatCurrency(data.taxAmount, data.clientInfo.currency)}`, 120, yPosition + 10);
   pdf.text(`Total: ${formatCurrency(data.grandTotal, data.clientInfo.currency)}`, 120, yPosition + 15);
-  
+
   pdf.save(filename);
 }
 

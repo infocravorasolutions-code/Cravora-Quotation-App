@@ -8,6 +8,9 @@ export default {
         'cravora-purple-light': '#a855f7',
         'cravora-purple-dark': '#7c3aed',
       },
+      fontFamily: {
+        sans: ['Poppins', 'sans-serif'],
+      },
     },
   },
   plugins: [],

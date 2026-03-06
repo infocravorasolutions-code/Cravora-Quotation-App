@@ -11,7 +11,7 @@ export default function ClientDetails() {
   const { clientInfo, setClientInfo, generateQuotationId, saveDraft } = useQuotationStore();
 
   const [formData, setFormData] = useState(clientInfo);
-  
+
   // Auto-save functionality
   useAutoSave(30000); // Auto-save every 30 seconds
 
@@ -53,7 +53,7 @@ export default function ClientDetails() {
           <div className="mb-6 sm:mb-8">
             <ProgressStepper currentStep={1} />
           </div>
-          
+
           <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-2 sm:p-6 lg:p-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 space-y-3 sm:space-y-0">
               <div>
@@ -149,18 +149,33 @@ export default function ClientDetails() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  Client GST Number
-                </label>
-                <input
-                  type="text"
-                  name="clientGstNumber"
-                  value={formData.clientGstNumber || ''}
-                  onChange={handleChange}
-                  className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
-                  placeholder="22AAAAA0000A1Z5"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                    Client GST Number
+                  </label>
+                  <input
+                    type="text"
+                    name="clientGstNumber"
+                    value={formData.clientGstNumber || ''}
+                    onChange={handleChange}
+                    className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
+                    placeholder="22AAAAA0000A1Z5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                    Client PAN Number
+                  </label>
+                  <input
+                    type="text"
+                    name="clientPan"
+                    value={formData.clientPan || ''}
+                    onChange={handleChange}
+                    className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
+                    placeholder="ABCDE1234F"
+                  />
+                </div>
               </div>
 
               <div>
@@ -177,18 +192,62 @@ export default function ClientDetails() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                  Company GST Number
-                </label>
-                <input
-                  type="text"
-                  name="gstNumber"
-                  value={formData.gstNumber || ''}
-                  onChange={handleChange}
-                  className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
-                  placeholder="22BBBBB0000B1Z5"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                    Company GST Number
+                  </label>
+                  <input
+                    type="text"
+                    name="gstNumber"
+                    value={formData.gstNumber || ''}
+                    onChange={handleChange}
+                    className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
+                    placeholder="22BBBBB0000B1Z5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                    Company PAN Number
+                  </label>
+                  <input
+                    type="text"
+                    name="companyPan"
+                    value={formData.companyPan || ''}
+                    onChange={handleChange}
+                    className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
+                    placeholder="ABCDE1234F"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                    Place of Supply (State)
+                  </label>
+                  <input
+                    type="text"
+                    name="placeOfSupply"
+                    value={formData.placeOfSupply || ''}
+                    onChange={handleChange}
+                    className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
+                    placeholder="e.g. Karnataka"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                    Country of Supply
+                  </label>
+                  <input
+                    type="text"
+                    name="countryOfSupply"
+                    value={formData.countryOfSupply || ''}
+                    onChange={handleChange}
+                    className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
+                    placeholder="e.g. India"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
