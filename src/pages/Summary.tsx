@@ -26,6 +26,7 @@ export default function Summary() {
     setTermsAndConditions,
     documentType,
     setDocumentType,
+    generateQuotationId,
   } = useQuotationStore();
 
   // Auto-save functionality
@@ -197,7 +198,10 @@ export default function Summary() {
                   <input
                     type="radio"
                     checked={documentType === 'Quotation'}
-                    onChange={() => setDocumentType('Quotation')}
+                    onChange={async () => {
+                      setDocumentType('Quotation');
+                      await generateQuotationId();
+                    }}
                     className="w-4 h-4 text-cravora-purple focus:ring-cravora-purple border-gray-300"
                   />
                   <span className="text-gray-700 font-medium">Quotation</span>
@@ -206,7 +210,10 @@ export default function Summary() {
                   <input
                     type="radio"
                     checked={documentType === 'Billing'}
-                    onChange={() => setDocumentType('Billing')}
+                    onChange={async () => {
+                      setDocumentType('Billing');
+                      await generateQuotationId();
+                    }}
                     className="w-4 h-4 text-cravora-purple focus:ring-cravora-purple border-gray-300"
                   />
                   <span className="text-gray-700 font-medium">Billing</span>

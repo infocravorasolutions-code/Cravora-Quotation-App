@@ -47,7 +47,7 @@ export async function generatePDF(
   // Ensure fonts are fully loaded before rendering
   await document.fonts.ready;
 
-  const canvas = await html2canvas(element, {
+    const canvas = await html2canvas(element, {
     scale: settings.scale,
     useCORS: true,
     logging: true, // Enable logging for debugging
@@ -61,6 +61,40 @@ export async function generatePDF(
     onclone: (clonedDoc) => {
       console.log('Cloned document:', clonedDoc);
       const clonedElement = clonedDoc.getElementById(elementId);
+
+      // Inject Poppins font explicitly into the cloned document so html2canvas can render it
+      const style = clonedDoc.createElement('style');
+      style.innerHTML = `
+        @font-face {
+          font-family: 'Poppins';
+          src: url('/fonts/Poppins-Regular.ttf') format('truetype');
+          font-weight: 400;
+          font-style: normal;
+        }
+        @font-face {
+          font-family: 'Poppins';
+          src: url('/fonts/Poppins-Medium.ttf') format('truetype');
+          font-weight: 500;
+          font-style: normal;
+        }
+        @font-face {
+          font-family: 'Poppins';
+          src: url('/fonts/Poppins-SemiBold.ttf') format('truetype');
+          font-weight: 600;
+          font-style: normal;
+        }
+        @font-face {
+          font-family: 'Poppins';
+          src: url('/fonts/Poppins-Bold.ttf') format('truetype');
+          font-weight: 700;
+          font-style: normal;
+        }
+        * {
+          font-family: 'Poppins', sans-serif !important;
+        }
+      `;
+      clonedDoc.head.appendChild(style);
+
       if (clonedElement) {
         // Strip margins that cause slice mismatches during mult-page rendering
         Array.from(clonedElement.children).forEach((child: any) => {
@@ -97,8 +131,8 @@ export async function generatePDF(
   pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
   heightLeft -= pageHeight;
 
-  // Ignore less than 20mm of remaining trailing height to fiercely prevent floating-point rounding errors or minor padding from triggering a blank tail page
-  while (heightLeft > 20) {
+  // Ignore less than 50mm of remaining trailing height to fiercely prevent floating-point rounding errors or minor padding from triggering a blank tail page
+  while (heightLeft > 50) {
     position = heightLeft - imgHeight;
     pdf.addPage();
     pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);

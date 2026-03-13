@@ -224,35 +224,6 @@ export default function ClientDetails() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                    Place of Supply (State)
-                  </label>
-                  <input
-                    type="text"
-                    name="placeOfSupply"
-                    value={formData.placeOfSupply || ''}
-                    onChange={handleChange}
-                    className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
-                    placeholder="e.g. Karnataka"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                    Country of Supply
-                  </label>
-                  <input
-                    type="text"
-                    name="countryOfSupply"
-                    value={formData.countryOfSupply || ''}
-                    onChange={handleChange}
-                    className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
-                    placeholder="e.g. India"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     Currency *
                   </label>
                   <select

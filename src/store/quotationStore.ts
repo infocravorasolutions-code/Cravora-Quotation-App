@@ -64,9 +64,9 @@ export interface QuotationState {
   getTaxAmount: () => number;
   getGstAmount: () => number;
   getGrandTotal: () => number;
-  generateQuotationId: () => void;
-  saveDraft: () => void;
-  loadDraft: (draftId: string) => void;
+  generateQuotationId: () => Promise<void>;
+  saveDraft: () => Promise<void>;
+  loadDraft: (draftId: string) => Promise<void>;
   markAsDraft: () => void;
   markAsFinal: () => void;
   reset: () => void;
@@ -225,26 +225,50 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
     return subtotal - discount + gstAmount;
   },
 
-  generateQuotationId: () => {
-    const year = new Date().getFullYear();
-    const existing = JSON.parse(localStorage.getItem('quotations') || '[]');
-    const count = existing.length + 1;
-    const id = `QTN-${year}-${String(count).padStart(3, '0')}`;
-    set({ quotationId: id });
+  generateQuotationId: async () => {
+    try {
+      const state = get();
+      const year = new Date().getFullYear();
+      const prefix = state.documentType === 'Billing' ? 'BILL' : 'QTN';
+
+      const res = await fetch('http://localhost:5000/api/quotations');
+      const existing = await res.json();
+
+      // Count only IDs for the same document type and current year
+      const countForTypeAndYear = existing.filter((q: any) => {
+        const id: string | undefined = q?.quotationId;
+        if (!id) return false;
+        const matchesPrefix = id.startsWith(`${prefix}-${year}-`);
+        const matchesType = q?.documentType === state.documentType;
+        return matchesPrefix && matchesType;
+      }).length;
+
+      const nextNumber = countForTypeAndYear + 1;
+      const id = `${prefix}-${year}-${String(nextNumber).padStart(3, '0')}`;
+      set({ quotationId: id });
+    } catch (error) {
+      console.error('Failed to generate ID. Is backend running?', error);
+      const state = get();
+      const year = new Date().getFullYear();
+      const prefixFallback = state.documentType === 'Billing' ? 'BILL' : 'QTN';
+      const id = `${prefixFallback}-${year}-${Math.floor(Math.random() * 1000)}`;
+      set({ quotationId: id });
+    }
   },
 
-  saveDraft: () => {
+  saveDraft: async () => {
     const state = get();
     const draftId = state.quotationId || `DRAFT-${Date.now()}`;
 
     const draft = {
-      id: draftId,
+      quotationId: draftId,
       clientInfo: state.clientInfo,
       modules: state.modules,
       tax: state.tax,
       discountRate: state.discountRate,
       termsAndConditions: state.termsAndConditions,
       documentType: state.documentType,
+      gstDetails: state.gstDetails,
       isDraft: true,
       lastSaved: new Date().toISOString(),
       subtotal: state.getSubtotal(),
@@ -253,33 +277,51 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
       grandTotal: state.getGrandTotal(),
     };
 
-    const existingDrafts = JSON.parse(localStorage.getItem('drafts') || '[]');
-    const updatedDrafts = existingDrafts.filter((d: any) => d.id !== draftId);
-    updatedDrafts.push(draft);
-
-    localStorage.setItem('drafts', JSON.stringify(updatedDrafts));
-    set({ lastSaved: new Date().toISOString() });
+    try {
+      const existingRes = await fetch(`http://localhost:5000/api/quotations/${draftId}`);
+      if (existingRes.ok) {
+        await fetch(`http://localhost:5000/api/quotations/${draftId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(draft),
+        });
+      } else {
+        await fetch('http://localhost:5000/api/quotations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(draft),
+        });
+      }
+      set({ lastSaved: new Date().toISOString() });
+    } catch (error) {
+      console.error('Error saving draft', error);
+    }
   },
 
-  loadDraft: (draftId: string) => {
-    const drafts = JSON.parse(localStorage.getItem('drafts') || '[]');
-    const draft = drafts.find((d: any) => d.id === draftId);
-
-    if (draft) {
-      set({
-        clientInfo: draft.clientInfo,
-        modules: draft.modules,
-        tax: draft.tax,
-        discountRate: draft.discountRate || 0,
-        termsAndConditions: draft.termsAndConditions || [
-          'Please pay within 15 days from the date of invoice, overdue interest @ 14% will be charged on delayed payments.',
-          'Please quote invoice number when remitting funds.'
-        ],
-        documentType: draft.documentType || 'Quotation',
-        quotationId: draft.id,
-        isDraft: true,
-        lastSaved: draft.lastSaved,
-      });
+  loadDraft: async (draftId: string) => {
+    const state = get();
+    try {
+      const res = await fetch(`http://localhost:5000/api/quotations/${draftId}`);
+      if (res.ok) {
+        const draft = await res.json();
+        set({
+          clientInfo: draft.clientInfo || state.clientInfo,
+          modules: draft.modules || [],
+          tax: draft.tax,
+          discountRate: draft.discountRate || 0,
+          termsAndConditions: draft.termsAndConditions || [
+            'Please pay within 15 days from the date of invoice, overdue interest @ 14% will be charged on delayed payments.',
+            'Please quote invoice number when remitting funds.'
+          ],
+          documentType: draft.documentType || 'Quotation',
+          gstDetails: draft.gstDetails || state.gstDetails,
+          quotationId: draft.quotationId,
+          isDraft: draft.isDraft !== undefined ? draft.isDraft : true,
+          lastSaved: draft.lastSaved,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load draft', error);
     }
   },
 
