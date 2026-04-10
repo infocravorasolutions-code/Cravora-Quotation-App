@@ -165,18 +165,39 @@ export default function PdfDocument({
                             {/* Header Section */}
                             <div className="flex items-start justify-between mb-2">
                                 <div className="flex flex-col gap-4">
-                                    <h1 className="text-4xl font-bold text-cravora-purple">
+                                    <h1 className="text-2xl text-cravora-purple uppercase">
                                         {documentType === 'Billing' ? 'Bill' : 'Quotation'}
                                     </h1>
-                                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mt-2">
-                                        <span className="text-gray-500 font-medium whitespace-nowrap">
-                                            {documentType === 'Billing' ? 'Bill#' : 'Quotation#'}
-                                        </span>
-                                        <span className="font-bold text-gray-800">{quotationId}</span>
-                                        <span className="text-gray-500 font-medium whitespace-nowrap">
-                                            {documentType === 'Billing' ? 'Bill Date' : 'Quotation Date'}
-                                        </span>
-                                        <span className="font-bold text-gray-800 uppercase">{format(new Date(), 'MMM dd, yyyy')}</span>
+                             <div className="grid grid-cols-3 gap-x-8 gap-y-3 text-sm mt-2">
+  {/* Row 1 */}
+  <span className="text-gray-500 font-medium uppercase">
+    {documentType === 'Billing' ? 'Bill No' : 'Customer ID'}
+  </span>
+  <span className="font-bold text-gray-800">{quotationId}</span>
+  <span></span>
+
+  {/* Row 2 */}
+  <span className="text-gray-500 font-medium uppercase">
+    Date
+  </span>
+  <span className="font-bold text-gray-800">
+    {format(new Date(), 'dd/MM/yyyy')}
+  </span>
+  <span></span>
+
+  {/* Row 3 */}
+  <span className="text-gray-500 font-medium uppercase">
+    Client
+  </span>
+  <span className="font-bold text-gray-800 uppercase">
+    {clientInfo.clientName}
+  </span>
+  <span></span>
+</div>
+
+                                      <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mt-2">
+                                        
+                                     
                                     </div>
                                 </div>
 
@@ -189,38 +210,10 @@ export default function PdfDocument({
                             {/* Information Boxes */}
                             <div className="grid grid-cols-2 gap-4 mb-2">
                                 {/* Quotation by / Billing by */}
-                                <div className="bg-purple-50 border border-purple-100 p-6 rounded-lg">
-                                    <h2 className="text-lg text-cravora-purple mb-2">
-                                        {documentType === 'Billing' ? 'Bill by' : 'Quotation by'}
-                                    </h2>
-                                    <div className="font-bold text-gray-800 mb-1">Cravora Solutions</div>
-                                    <div className="text-gray-600 mb-3 whitespace-pre-line">
-                                        {clientInfo.companyAddress || 'Default Company Address Here'}
-                                    </div>
-                                    <div className="grid grid-cols-[60px_1fr] gap-x-2 text-sm">
-                                        <span className="font-bold text-gray-800 text-xs">GSTIN</span>
-                                        <span className="text-gray-600 uppercase">{clientInfo.gstNumber || 'N/A'}</span>
-                                        <span className="font-bold text-gray-800 text-xs">PAN</span>
-                                        <span className="text-gray-600 uppercase">{clientInfo.companyPan || 'N/A'}</span>
-                                    </div>
-                                </div>
+                             
 
                                 {/* Quotation to / Billing to */}
-                                <div className="bg-purple-50 border border-purple-100 p-6 rounded-lg">
-                                    <h2 className="text-lg text-cravora-purple mb-2">
-                                        {documentType === 'Billing' ? 'Bill to' : 'Quotation to'}
-                                    </h2>
-                                    <div className="font-bold text-gray-800 mb-1">{clientInfo.clientName}</div>
-                                    <div className="text-gray-600 mb-3 whitespace-pre-line">
-                                        {clientInfo.clientAddress || 'Client Address Not Provided'}
-                                    </div>
-                                    <div className="grid grid-cols-[60px_1fr] gap-x-2 text-sm">
-                                        <span className="font-bold text-gray-800 text-xs">GSTIN</span>
-                                        <span className="text-gray-600 uppercase">{clientInfo.clientGstNumber || 'N/A'}</span>
-                                        <span className="font-bold text-gray-800 text-xs">PAN</span>
-                                        <span className="text-gray-600 uppercase">{clientInfo.clientPan || 'N/A'}</span>
-                                    </div>
-                                </div>
+                                
                             </div>
 
 
@@ -234,8 +227,8 @@ export default function PdfDocument({
                                     <thead className="bg-cravora-purple text-white">
                                         <tr>
                                             <th className="py-3 px-4 font-normal text-sm w-[45%]" style={{ verticalAlign: 'middle', paddingTop: 0}}>Item #/Item description</th>
-                                            <th className="py-3 px-4 font-normal text-sm text-center" style={{ verticalAlign: 'middle', paddingTop: 0}}>Qty.</th>
-                                            <th className="py-3 px-4 font-normal text-sm text-right" style={{ verticalAlign: 'middle', paddingTop: 0}}>Rate</th>
+                                            <th className="py-3 px-4 font-normal text-sm text-center" style={{ verticalAlign: 'middle', paddingTop: 0}}>Hours</th>
+                                            <th className="py-3 px-4 font-normal text-sm text-right" style={{ verticalAlign: 'middle', paddingTop: 0}}>Price</th>
                                             <th className="py-3 px-4 font-normal text-sm text-right" style={{ verticalAlign: 'middle', paddingTop: 0}}>Amount</th>
                                         </tr>
                                     </thead>
@@ -281,10 +274,11 @@ export default function PdfDocument({
                     {pageChunk.isLastPage && (
                         <div className="mt-8">
                             {/* Footer Section Grid */}
-                            <div className="grid grid-cols-2 gap-8 mb-4 border-b border-gray-200 relative pb-6">
+                            <div className="grid gap-8 mb-4  relative pb-6">
                                 {/* Left Side: Bank Details */}
                                 <div>
-                                    <div className="border border-purple-100 rounded-lg p-3 mb-4 bg-purple-50 shadow-sm">
+                                    
+                                    {/* <div className="border border-purple-100 rounded-lg p-3 mb-4 bg-purple-50 shadow-sm">
                                         <h3 className="font-bold text-cravora-purple text-base mb-2">
                                             Bank Details
                                         </h3>
@@ -300,14 +294,14 @@ export default function PdfDocument({
                                             <span className="font-semibold text-gray-900">Branch:</span>
                                             <span className="font-medium text-gray-800">ODHAV BRANCH AHMEDABAD, GUJARAT</span>
                                         </div>
-                                    </div>
+                                    </div> */}
                                 </div>
 
                                 {/* Right Side: Pricing Summary */}
                                 <div>
                                     <div className="space-y-3 mb-4 text-sm">
                                         <div className="flex justify-between">
-                                            <span className="text-gray-700">Sub Total</span>
+                                            <span className="text-gray-700 font-semibold uppercase">SUB TOTAL</span>
                                             <span className="font-medium text-gray-800 whitespace-nowrap">
                                                 {formatCurrency(subtotal, clientInfo.currency)}
                                             </span>
@@ -315,7 +309,7 @@ export default function PdfDocument({
 
                                         {discountRate > 0 && (
                                             <div className="flex justify-between text-[#28a745]">
-                                                <span>Discount({discountRate}%)</span>
+                                                <span>DISCOUNT {discountRate}%</span>
                                                 <span className="whitespace-nowrap">
                                                     - {formatCurrency(discountAmount, clientInfo.currency)}
                                                 </span>
@@ -324,7 +318,7 @@ export default function PdfDocument({
 
                                         {taxAmount > 0 && (
                                             <div className="flex justify-between text-gray-600">
-                                                <span>Tax ({tax}%)</span>
+                                                <span className="uppercase">TAX ({tax}%)</span>
                                                 <span className="whitespace-nowrap">
                                                     + {formatCurrency(taxAmount, clientInfo.currency)}
                                                 </span>
@@ -333,7 +327,7 @@ export default function PdfDocument({
                                     </div>
 
                                     <div className="flex justify-between items-center border-t border-gray-200 pt-3 mb-4">
-                                        <span className="text-lg text-gray-800">Total</span>
+                                        <span className="text-lg text-gray-800 font-bold uppercase">GRAND TOTAL</span>
                                         <span className="text-2xl font-bold text-gray-900 whitespace-nowrap">
                                             {formatCurrency(grandTotal, clientInfo.currency)}
                                         </span>
@@ -349,13 +343,10 @@ export default function PdfDocument({
 
                                 {/* Decorative background bottom matching the purple gradient blur effect */}
                                 <div
-                                    className="absolute -bottom-8 -left-8 -right-8 h-16 bg-gradient-to-t from-cravora-purple/10 to-transparent pointer-events-none"
+                                    className="absolute pointer-events-none"
                                     style={{ borderRadius: '0 0 1rem 1rem' }}
                                 />
-                            </div>
-
-                            {/* Full-width Terms and Conditions Section matching the provided design */}
-                            <div className="bg-[#fbf7ff] rounded-2xl p-6 mt-10 mb-2">
+                                      <div className="bg-[#fbf7ff] rounded-2xl p-6 mt-10 mb-2">
                                 <h3 className="font-bold text-cravora-purple text-sm mb-3">
                                     Terms and conditions:
                                 </h3>
@@ -372,6 +363,11 @@ export default function PdfDocument({
                                     })}
                                 </ul>
                             </div>
+                            </div>
+
+                            {/* Full-width Terms and Conditions Section matching the provided design */}
+                            
+                      
                         </div>
                     )}
 

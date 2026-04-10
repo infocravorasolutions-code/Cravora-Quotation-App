@@ -105,12 +105,20 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
   clientInfo: initialClientInfo,
   modules: [],
   tax: 18,
+<<<<<<< Updated upstream
+=======
   discountRate: 0,
   termsAndConditions: [
-    'Please pay within 15 days from the date of invoice, overdue interest @ 14% will be charged on delayed payments.',
-    'Please quote invoice number when remitting funds.'
+    'A 30% deposit is required before the project begins.',
+    'The remaining 70% is payable upon the completion of each project milestone or the final deadline.',
+    'Payments made for completed modules are non-refundable if the contract is terminated.',
+    `Any delays in providing designs or approvals from the client's side will result in an extension of the overall project timelines.`,
+    'The final delivery includes tested code with integrated APIs for each module.',
+    'All project details, including source code and designs, will be kept strictly confidential. '
+
   ],
   documentType: 'Quotation',
+>>>>>>> Stashed changes
   gstDetails: initialGstDetails,
   quotationId: '',
   isDraft: true,
