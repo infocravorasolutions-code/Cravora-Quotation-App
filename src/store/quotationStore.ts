@@ -105,8 +105,6 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
   clientInfo: initialClientInfo,
   modules: [],
   tax: 18,
-<<<<<<< Updated upstream
-=======
   discountRate: 0,
   termsAndConditions: [
     'A 30% deposit is required before the project begins.',
@@ -118,7 +116,6 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
 
   ],
   documentType: 'Quotation',
->>>>>>> Stashed changes
   gstDetails: initialGstDetails,
   quotationId: '',
   isDraft: true,
