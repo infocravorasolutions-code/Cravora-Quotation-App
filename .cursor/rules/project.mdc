@@ -1,0 +1,53 @@
+---
+description: Cravora stack, layout, API, data, and business rules
+alwaysApply: true
+---
+
+# Project
+
+Quotation and billing app. Extend it. Do not rebuild it.
+
+## Stack
+
+- Frontend: React 18, TypeScript, Vite, Tailwind, React Router, Zustand. Also date-fns, framer-motion, lucide-react, html2canvas, jspdf.
+- Backend: Node, Express 5, Mongoose, cors, dotenv. Entry `backend/server.js`. Start with `npm start` in `backend/`.
+- Database: MongoDB. URI is `MONGODB_URI` or `mongodb://127.0.0.1:27017/cravora_quotations`.
+- Auth: one admin account created on the login screen. Later visits sign in. Public document access stays a random token, not that login. API routes except `/api/auth/status`, `/api/auth/setup`, `/api/auth/login`, and `/api/public` require the session token.
+- `@supabase/supabase-js` is installed on the frontend and unused. MongoDB is the database.
+- Email uses nodemailer. SMTP settings stay in the environment.
+
+## Layout
+
+- `src/pages/` — wizard (`/`, `/modules`, `/summary`, `/pdf-preview`), `History` (`/history`), plus Clients, Invoices, Payments, Receipts, Dashboard, Settings, and `/public/quotation/:token`
+- `src/components/` — `Navbar`, `ProgressStepper`, `GSTConfiguration`, `PdfDocument`
+- `src/store/quotationStore.ts` — quotation wizard state, totals, and API saves
+- `src/utils/api.ts` — `http://localhost:5000` for API calls
+- `backend/models/` — `Quotation`, `Client`, `Invoice`, `Payment`, `Receipt`, `AuditLog`, `Counter`
+- `backend/utils/` — totals, numbering, audit. `backend/services/mailer.js` — email only
+- Frontend scripts: `dev`, `build`, `lint`, `typecheck`, `preview`. No test runner.
+
+## API
+
+- `/api/quotations` CRUD stays. Public id is `quotationId` (`QTN-YYYY-NNN` or `BILL-YYYY-NNN`). POST requires `quotationId` and rejects duplicates.
+- Also `/api/clients`, `/api/invoices`, `/api/payments`, `/api/receipts`, `/api/audit-logs`, `/api/reports/summary`, `/api/public/quotations/:token`.
+- JSON errors are `{ message }`.
+- Frontend wizard still persists drafts through `saveDraft` / `loadDraft`.
+
+## Business rules
+
+- `documentType` is `Quotation` or `Billing`. That label is not an invoice. Invoices are a separate document created from an accepted quotation.
+- Currency is `INR` or `USD`. Pricing is `Hourly` or `Fixed`. Line total is `hours * rate`.
+- Discount is a percent of subtotal. GST applies to subtotal minus discount. `intra` splits CGST + SGST. `inter` uses IGST. Rates: 0, 5, 12, 18, 28. Default is intra at 18%.
+- Grand total is subtotal − discount + GST. New documents start as drafts (`isDraft: true`).
+- Quotation status values: `draft`, `sent`, `viewed`, `accepted`, `rejected`, `expired`, `converted`. Missing status on old rows means draft when `isDraft` is true, otherwise `final`.
+- `saveDraft` must not turn a sent, viewed, accepted, rejected, expired, or converted quotation back into a draft.
+- Issue stores `issuedSnapshot` and `publicToken`. Later edits must not change that snapshot. Reprint and the public page use the snapshot.
+- Server recalculates totals on issue, invoice conversion, and payment. Do not trust client totals for those actions.
+- Invoice status values: `draft`, `issued`, `partially_paid`, `paid`, `overdue`, `cancelled`. Payment status is updated only by payment routes.
+- A quotation stores `clientInfo` as a snapshot. Client edits must not rewrite old quotations.
+
+## Changes
+
+- Preserve quotation, GST, draft, history, and PDF behavior.
+- Extend the store, pages, components, utils, and routers. Do not copy a second wizard or PDF stack.
+- Prefer the smallest change. Leave unrelated files alone.

@@ -27,6 +27,10 @@ export default function Summary() {
     documentType,
     setDocumentType,
     generateQuotationId,
+    notes,
+    setNotes,
+    validUntil,
+    setValidUntil,
   } = useQuotationStore();
 
   // Auto-save functionality
@@ -55,9 +59,13 @@ export default function Summary() {
 
   // Debug: Log modules to console (removed to prevent performance issues)
 
-  const handleSaveDraft = () => {
-    saveDraft();
-    alert('Draft saved successfully!');
+  const handleSaveDraft = async () => {
+    try {
+      await saveDraft();
+      alert('Draft saved. Open Quotations to see it.');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not save the draft');
+    }
   };
 
   return (
@@ -77,7 +85,7 @@ export default function Summary() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-                  Quotation Summary
+                  Review & send
                 </h1>
                 <p className="text-sm sm:text-base text-gray-600">
                   Review and finalize your quotation for {clientInfo.projectName}
@@ -200,7 +208,7 @@ export default function Summary() {
                     checked={documentType === 'Quotation'}
                     onChange={async () => {
                       setDocumentType('Quotation');
-                      await generateQuotationId();
+                      await generateQuotationId(true);
                     }}
                     className="w-4 h-4 text-cravora-purple focus:ring-cravora-purple border-gray-300"
                   />
@@ -212,7 +220,7 @@ export default function Summary() {
                     checked={documentType === 'Billing'}
                     onChange={async () => {
                       setDocumentType('Billing');
-                      await generateQuotationId();
+                      await generateQuotationId(true);
                     }}
                     className="w-4 h-4 text-cravora-purple focus:ring-cravora-purple border-gray-300"
                   />
@@ -224,6 +232,28 @@ export default function Summary() {
             {/* GST Configuration */}
             <div className="mb-8">
               <GSTConfiguration />
+            </div>
+
+            <div className="mb-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Valid until</label>
+                <input
+                  type="date"
+                  value={validUntil ? validUntil.slice(0, 10) : ''}
+                  onChange={(e) => setValidUntil(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cravora-purple"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cravora-purple"
+                  placeholder="Optional note for this quotation"
+                />
+              </div>
             </div>
 
             {/* Editable Terms & Conditions */}

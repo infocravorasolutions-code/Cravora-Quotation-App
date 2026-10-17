@@ -3,14 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, Save } from 'lucide-react';
 import { useQuotationStore } from '../store/quotationStore';
+import { apiJson, asItems } from '../utils/api';
 import ProgressStepper from '../components/ProgressStepper';
 import { useAutoSave } from '../hooks/useAutoSave';
 
 export default function ClientDetails() {
   const navigate = useNavigate();
-  const { clientInfo, setClientInfo, generateQuotationId, saveDraft } = useQuotationStore();
+  const { clientInfo, setClientInfo, generateQuotationId, saveDraft, clientId, setClientId } = useQuotationStore();
 
   const [formData, setFormData] = useState(clientInfo);
+  const [clients, setClients] = useState<Array<{ _id: string; companyName: string; email: string; gstin?: string; billingAddress?: string; shippingAddress?: string }>>([]);
 
   // Auto-save functionality
   useAutoSave(30000); // Auto-save every 30 seconds
@@ -18,6 +20,26 @@ export default function ClientDetails() {
   useEffect(() => {
     generateQuotationId();
   }, [generateQuotationId]);
+
+  useEffect(() => {
+    apiJson('/api/clients?limit=100')
+      .then((data) => setClients(asItems(data)))
+      .catch((error) => console.error('Failed to load clients', error));
+  }, []);
+
+  const handleSelectClient = (id: string) => {
+    setClientId(id);
+    const client = clients.find((item) => item._id === id);
+    if (!client) return;
+    setFormData((current) => ({
+      ...current,
+      clientName: client.companyName,
+      clientEmail: client.email,
+      clientAddress: client.billingAddress || '',
+      clientGstNumber: client.gstin || '',
+      shippingAddress: client.shippingAddress || '',
+    }));
+  };
 
   useEffect(() => {
     // Update store when form data changes
@@ -36,9 +58,13 @@ export default function ClientDetails() {
     navigate('/modules');
   };
 
-  const handleSaveDraft = () => {
-    saveDraft();
-    alert('Draft saved successfully!');
+  const handleSaveDraft = async () => {
+    try {
+      await saveDraft();
+      alert('Draft saved. Open Quotations to see it.');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not save the draft');
+    }
   };
 
   return (
@@ -76,6 +102,23 @@ export default function ClientDetails() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-6">
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                  Existing client
+                </label>
+                <select
+                  value={clientId}
+                  onChange={(e) => handleSelectClient(e.target.value)}
+                  className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
+                >
+                  <option value="">New client</option>
+                  {clients.map((client) => (
+                    <option key={client._id} value={client._id}>
+                      {client.companyName} ({client.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   Client Name *

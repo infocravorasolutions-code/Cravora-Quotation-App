@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { Eye, Trash2, Plus, Download } from 'lucide-react';
+import { Trash2, Plus, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../utils/currency';
-import { useQuotationStore } from '../store/quotationStore';
+import { useQuotationStore, type ClientInfo, type Module } from '../store/quotationStore';
 import { generatePDF } from '../utils/pdfGenerator';
 import PdfDocument from '../components/PdfDocument';
+import { API_BASE, apiJson, blobToBase64, publicQuotationUrl } from '../utils/api';
+import SectionNav from '../components/SectionNav';
+import { quotationLinks, quotationStatusLabel } from '../utils/labels';
 
 interface SavedQuotation {
   id: string;
@@ -16,8 +19,27 @@ interface SavedQuotation {
   date: string;
   total: number;
   status: string;
-  clientInfo: any;
-  modules: any[];
+  publicToken?: string;
+  discountRate?: number;
+  discountAmount?: number;
+  gstDetails?: {
+    gstType?: string;
+    cgstRate?: number;
+    sgstRate?: number;
+    igstRate?: number;
+    cgstAmount?: number;
+    sgstAmount?: number;
+    igstAmount?: number;
+    totalGstAmount?: number;
+  };
+  termsAndConditions?: string[];
+  documentType?: string;
+  issuedAt?: string;
+  notes?: string;
+  rejectionReason?: string;
+  validUntil?: string;
+  clientInfo: ClientInfo;
+  modules: Module[];
   tax: number;
   subtotal: number;
   taxAmount: number;
@@ -36,18 +58,64 @@ export default function History() {
 
   const loadQuotations = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/quotations');
+      const token = localStorage.getItem('cravora.token');
+      const res = await fetch(`${API_BASE}/api/quotations`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
-        const data = await res.json();
-        const mapped = data.map((q: any) => ({
+        const data = await res.json() as Array<{
+          quotationId: string;
+          clientInfo?: ClientInfo;
+          isDraft?: boolean;
+          status?: string;
+          publicToken?: string;
+          lastSaved?: string;
+          updatedAt?: string;
+          grandTotal?: number;
+          discountRate?: number;
+          discountAmount?: number;
+          gstDetails?: SavedQuotation['gstDetails'];
+          termsAndConditions?: string[];
+          documentType?: string;
+          issuedAt?: string;
+          notes?: string;
+          rejectionReason?: string;
+          validUntil?: string;
+          modules?: Module[];
+          tax?: number;
+          subtotal?: number;
+          taxAmount?: number;
+          issuedSnapshot?: {
+            discountRate?: number;
+            discountAmount?: number;
+            gstDetails?: SavedQuotation['gstDetails'];
+            termsAndConditions?: string[];
+            issuedAt?: string;
+            notes?: string;
+            validUntil?: string;
+            clientInfo?: ClientInfo;
+            modules?: Module[];
+          };
+        }>;
+        const mapped = data.map((q) => ({
           id: q.quotationId,
           clientName: q.clientInfo?.clientName || 'Unknown',
           projectName: q.clientInfo?.projectName || 'Unknown',
           date: q.lastSaved || q.updatedAt || new Date().toISOString(),
           total: q.grandTotal || 0,
-          status: q.isDraft ? 'Draft' : 'Final',
-          clientInfo: q.clientInfo,
-          modules: q.modules || [],
+          status: q.status || (q.isDraft ? 'draft' : 'final'),
+          publicToken: q.publicToken,
+          discountRate: q.discountRate || q.issuedSnapshot?.discountRate || 0,
+          discountAmount: q.discountAmount || q.issuedSnapshot?.discountAmount || 0,
+          gstDetails: q.issuedSnapshot?.gstDetails || q.gstDetails,
+          termsAndConditions: q.issuedSnapshot?.termsAndConditions || q.termsAndConditions || [],
+          documentType: q.documentType,
+          issuedAt: q.issuedAt || q.issuedSnapshot?.issuedAt,
+          notes: q.issuedSnapshot?.notes || q.notes,
+          rejectionReason: q.rejectionReason,
+          validUntil: q.issuedSnapshot?.validUntil || q.validUntil,
+          clientInfo: (q.issuedSnapshot?.clientInfo || q.clientInfo) as ClientInfo,
+          modules: q.issuedSnapshot?.modules || q.modules || [],
           tax: q.tax || 0,
           subtotal: q.subtotal || 0,
           taxAmount: q.taxAmount || 0,
@@ -63,15 +131,96 @@ export default function History() {
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this quotation?')) {
       try {
-        const res = await fetch(`http://localhost:5000/api/quotations/${id}`, { method: 'DELETE' });
+        const token = localStorage.getItem('cravora.token');
+        const res = await fetch(`${API_BASE}/api/quotations/${id}`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
         if (res.ok) {
           setQuotations(quotations.filter((q) => q.id !== id));
         } else {
-          console.error('Failed to delete from server');
+          const data = await res.json().catch(() => ({}));
+          alert(data.message || 'Failed to delete from server');
         }
       } catch (error) {
         console.error('Failed to delete quotation', error);
       }
+    }
+  };
+
+  const handleEmail = async (quotation: SavedQuotation) => {
+    try {
+      if (!quotation.publicToken) {
+        await apiJson(`/api/quotations/${quotation.id}/issue`, { method: 'POST' });
+      }
+      const { loadDraft } = useQuotationStore.getState();
+      await loadDraft(quotation.id);
+      const state = useQuotationStore.getState();
+      const source = state.issuedAt ? state : null;
+      setGeneratingPdfFor({
+        ...quotation,
+        clientInfo: state.clientInfo,
+        modules: state.modules,
+        tax: state.tax,
+        subtotal: state.getSubtotal(),
+        taxAmount: state.getTaxAmount(),
+        grandTotal: state.getGrandTotal(),
+        discountRate: state.discountRate,
+        discountAmount: state.getDiscountAmount(),
+        gstDetails: state.gstDetails,
+        termsAndConditions: state.termsAndConditions,
+        documentType: state.documentType,
+        issuedAt: source ? state.issuedAt || undefined : undefined,
+        notes: state.notes,
+        validUntil: state.validUntil,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const blob = await generatePDF('hidden-pdf-content', `${quotation.id}.pdf`, { download: false });
+      await apiJson(`/api/quotations/${quotation.id}/email`, {
+        method: 'POST',
+        body: JSON.stringify({
+          to: state.clientInfo.clientEmail,
+          pdfBase64: await blobToBase64(blob),
+          appUrl: window.location.origin,
+        }),
+      });
+      alert('Quotation email sent.');
+      await loadQuotations();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not email quotation');
+    } finally {
+      setGeneratingPdfFor(null);
+    }
+  };
+
+  const handleConvert = async (quotation: SavedQuotation) => {
+    const due = quotation.validUntil ? new Date(quotation.validUntil) : new Date();
+    if (!quotation.validUntil) due.setDate(due.getDate() + 15);
+    const total = formatCurrency(quotation.grandTotal || quotation.total, quotation.clientInfo?.currency || 'INR');
+    if (!confirm(`Create an invoice for ${total}? The due date will be ${due.toLocaleDateString()}.`)) return;
+    try {
+      const invoice = await apiJson(`/api/quotations/${quotation.id}/convert`, {
+        method: 'POST',
+        body: JSON.stringify({ dueDate: quotation.validUntil || undefined }),
+      });
+      navigate(`/invoices/${invoice.invoiceNumber}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not convert quotation');
+    }
+  };
+
+  const openInvoice = async (quotationId: string) => {
+    try {
+      const data = await apiJson(`/api/invoices?q=${encodeURIComponent(quotationId)}&limit=20`);
+      const items = (data.items || []) as Array<{ quotationId?: string; invoiceNumber?: string }>;
+      const match = items.find((item) => item.quotationId === quotationId);
+      if (!match) {
+        alert('No invoice is linked to this quotation yet.');
+        return;
+      }
+      navigate(`/invoices/${match.invoiceNumber}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not open the invoice');
     }
   };
 
@@ -136,14 +285,15 @@ export default function History() {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-7xl mx-auto"
         >
+          <SectionNav links={quotationLinks} />
           <div className="bg-white rounded-2xl shadow-lg p-8">
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                  Quotation History
+                  Quotations
                 </h1>
                 <p className="text-gray-600">
-                  View and manage all your saved quotations
+                  Drafts, sent quotes, and accepted quotes ready for an invoice
                 </p>
               </div>
               <motion.button
@@ -159,11 +309,8 @@ export default function History() {
 
             {quotations.length === 0 ? (
               <div className="text-center py-16">
-                <div className="text-gray-400 mb-4">
-                  <Eye className="w-16 h-16 mx-auto" />
-                </div>
                 <p className="text-gray-600 mb-6">
-                  No quotations found. Create your first one!
+                  No quotations yet. Create one for a client, then send it.
                 </p>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -214,6 +361,7 @@ export default function History() {
                           <span className="font-mono text-sm text-gray-700">
                             {quotation.id}
                           </span>
+                          <span className="mt-1 block text-xs text-gray-500">{quotation.documentType === 'Billing' ? 'Bill' : 'Quotation'}</span>
                         </td>
                         <td className="py-4 px-4 text-gray-800">
                           {quotation.clientName}
@@ -231,41 +379,48 @@ export default function History() {
                           )}
                         </td>
                         <td className="text-center py-4 px-4">
-                          <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            {quotation.status}
+                          <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-purple-50 text-cravora-purple">
+                            {quotationStatusLabel(quotation.status)}
                           </span>
                         </td>
                         <td className="text-center py-4 px-4">
-                          <div className="flex items-center justify-center space-x-2">
-                            {quotation.status === 'Draft' && (
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleEditDraft(quotation.id)}
-                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-                                title="Continue Editing"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </motion.button>
+                          <div className="flex items-center justify-center gap-2">
+                            {quotation.status === 'draft' && (
+                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => handleEditDraft(quotation.id)}>Edit</button>
                             )}
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => handleDownloadQuotation(quotation)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                              title="Download PDF"
-                            >
+                            {quotation.status === 'final' && quotation.documentType === 'Billing' && (
+                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => handleConvert(quotation)}>Create invoice</button>
+                            )}
+                            {quotation.status === 'final' && quotation.documentType !== 'Billing' && (
+                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => handleEditDraft(quotation.id)}>Edit</button>
+                            )}
+                            {quotation.status === 'sent' && (
+                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => {
+                                const link = quotation.publicToken ? publicQuotationUrl(quotation.publicToken) : '';
+                                if (link) navigator.clipboard.writeText(link);
+                                alert(link || 'Issue the quotation before sharing a link.');
+                              }}>View link</button>
+                            )}
+                            {quotation.status === 'viewed' && (
+                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => handleEmail(quotation)}>Follow up</button>
+                            )}
+                            {quotation.status === 'accepted' && (
+                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => handleConvert(quotation)}>Create invoice</button>
+                            )}
+                            {quotation.status === 'rejected' && (
+                              <button type="button" className="rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-medium text-white" onClick={() => alert(quotation.rejectionReason || 'No reason was recorded.')}>View reason</button>
+                            )}
+                            {quotation.status === 'converted' && (
+                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => openInvoice(quotation.id)}>Open invoice</button>
+                            )}
+                            <button type="button" className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Download PDF" onClick={() => handleDownloadQuotation(quotation)}>
                               <Download className="w-4 h-4" />
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => handleDelete(quotation.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </motion.button>
+                            </button>
+                            {quotation.status === 'draft' && (
+                              <button type="button" className="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="Delete" onClick={() => handleDelete(quotation.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </motion.tr>
@@ -287,13 +442,17 @@ export default function History() {
               modules={generatingPdfFor.modules}
               quotationId={generatingPdfFor.id}
               tax={generatingPdfFor.tax}
-              discountRate={0} // History view doesn't save this yet, but we will pass 0
+              discountRate={generatingPdfFor.discountRate || 0}
               subtotal={generatingPdfFor.subtotal}
               taxAmount={generatingPdfFor.taxAmount}
-              discountAmount={0}
+              discountAmount={generatingPdfFor.discountAmount || 0}
               grandTotal={generatingPdfFor.grandTotal}
-              termsAndConditions={useQuotationStore.getState().termsAndConditions}
-              documentType={useQuotationStore.getState().documentType}
+              termsAndConditions={generatingPdfFor.termsAndConditions || useQuotationStore.getState().termsAndConditions}
+              documentType={generatingPdfFor.documentType || useQuotationStore.getState().documentType}
+              issuedAt={generatingPdfFor.issuedAt}
+              validUntil={generatingPdfFor.validUntil}
+              notes={generatingPdfFor.notes}
+              gstDetails={generatingPdfFor.gstDetails}
               id="hidden-pdf-content-inner"
             />
           </div>

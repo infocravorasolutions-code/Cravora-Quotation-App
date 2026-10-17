@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQuotationStore } from '../store/quotationStore';
 
 export function useAutoSave(interval: number = 30000) { // 30 seconds default
-  const { saveDraft, clientInfo, modules, buffer, tax, isDraft } = useQuotationStore();
+  const { saveDraft, clientInfo, modules, tax, isDraft, status } = useQuotationStore();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef<string | null>(null);
 
@@ -15,9 +15,10 @@ export function useAutoSave(interval: number = 30000) { // 30 seconds default
     // Only auto-save if there's meaningful data and it's a draft
     const hasData = clientInfo.clientName || clientInfo.clientEmail || modules.length > 0;
     
-    if (hasData && isDraft) {
+    const locked = ['sent', 'viewed', 'accepted', 'rejected', 'expired', 'converted'].includes(status);
+    if (hasData && isDraft && !locked) {
       timeoutRef.current = setTimeout(() => {
-        saveDraft();
+        saveDraft().catch(() => undefined);
         lastSavedRef.current = new Date().toISOString();
       }, interval);
     }
@@ -27,7 +28,7 @@ export function useAutoSave(interval: number = 30000) { // 30 seconds default
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [clientInfo, modules, buffer, tax, isDraft, saveDraft, interval]);
+  }, [clientInfo, modules, tax, isDraft, status, saveDraft, interval]);
 
   // Cleanup on unmount
   useEffect(() => {

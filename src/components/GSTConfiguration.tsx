@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, MapPin, Receipt } from 'lucide-react';
+import { Receipt } from 'lucide-react';
 import { useQuotationStore, GSTDetails } from '../store/quotationStore';
 
 export default function GSTConfiguration() {

@@ -3,9 +3,44 @@ import { motion } from 'framer-motion';
 import { Download, Save, Settings } from 'lucide-react';
 import { useQuotationStore } from '../store/quotationStore';
 import { generatePDF, PDFOptions } from '../utils/pdfGenerator';
-import { useState } from 'react';
+import { API_BASE, apiJson, authHeaders, blobToBase64, publicQuotationUrl } from '../utils/api';
+import { useLayoutEffect, useRef, useState } from 'react';
 import ProgressStepper from '../components/ProgressStepper';
 import PdfDocument from '../components/PdfDocument';
+function FitSheet({ children }: { children: React.ReactNode }) {
+  const frame = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ scale: 1, height: 1123 });
+
+  useLayoutEffect(() => {
+    const node = frame.current;
+    if (!node) return;
+    const fit = () => {
+      const sheet = node.querySelector('[data-pdf-page]') as HTMLElement | null;
+      const sheetWidth = sheet?.offsetWidth || 794;
+      const pages = [...node.querySelectorAll<HTMLElement>('[data-pdf-page]')];
+      const height = pages.reduce((sum, page) => sum + page.offsetHeight, 0) + Math.max(0, pages.length - 1) * 16;
+      const scale = node.clientWidth > 0 ? Math.min(1, node.clientWidth / sheetWidth) : 1;
+      setBox({ scale, height: height || 1123 });
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(node);
+    const content = node.querySelector('#pdf-content');
+    if (content) observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={frame} className="w-full">
+      <div style={{ width: 794 * box.scale, height: box.height * box.scale, margin: '0 auto', overflow: 'hidden' }}>
+        <div style={{ width: 794, transform: `scale(${box.scale})`, transformOrigin: 'top left' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PdfPreview() {
   const navigate = useNavigate();
   const {
@@ -24,6 +59,13 @@ export default function PdfPreview() {
     termsAndConditions,
     documentType,
     gstDetails,
+    notes,
+    validUntil,
+    issuedAt,
+    status,
+    publicToken,
+    setLifecycle,
+    generateQuotationId,
   } = useQuotationStore();
 
   const [pdfOptions, setPdfOptions] = useState<PDFOptions>({
@@ -62,6 +104,12 @@ export default function PdfPreview() {
       // Use original PDF generation method (html2canvas)
       await generatePDF('pdf-content', `${quotationId}.pdf`, pdfOptions);
 
+      const locked = ['sent', 'viewed', 'accepted', 'rejected', 'expired', 'converted'].includes(status);
+      if (locked || issuedAt) {
+        alert('PDF downloaded.');
+        return;
+      }
+
       const quotation = {
         quotationId: quotationId,
         clientInfo,
@@ -79,40 +127,96 @@ export default function PdfPreview() {
         grandTotal: getGrandTotal(),
       };
 
-      try {
-        const res = await fetch(`http://localhost:5000/api/quotations/${quotationId}`);
-        if (res.ok) {
-          await fetch(`http://localhost:5000/api/quotations/${quotationId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(quotation),
-          });
-        } else {
-          await fetch('http://localhost:5000/api/quotations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(quotation),
-          });
-        }
-      } catch (error) {
-        console.error('Failed to save final quotation', error);
+      const headers = authHeaders({ 'Content-Type': 'application/json' });
+      const res = await fetch(`${API_BASE}/api/quotations/${quotationId}`, { headers: authHeaders() });
+      let saved: Response;
+      if (res.ok) {
+        saved = await fetch(`${API_BASE}/api/quotations/${quotationId}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(quotation),
+        });
+      } else if (res.status === 404) {
+        saved = await fetch(`${API_BASE}/api/quotations`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(quotation),
+        });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Could not save this bill');
+      }
+      if (!saved.ok) {
+        const data = await saved.json().catch(() => ({}));
+        throw new Error(data.message || 'Could not save this bill');
       }
 
       markAsFinal();
-      alert('Quotation saved successfully!');
+      alert('Saved. Open Quotations to see this bill.');
       reset();
       navigate('/history');
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Error generating PDF. Please try again.');
+      alert(error instanceof Error ? error.message : 'Error generating PDF. Please try again.');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleSaveDraft = () => {
-    saveDraft();
-    alert('Draft saved successfully!');
+  const handleSaveDraft = async () => {
+    const current = useQuotationStore.getState().status;
+    if (['sent', 'viewed', 'accepted', 'rejected', 'expired', 'converted'].includes(current)) {
+      alert('This quotation has already been issued and was not changed.');
+      return;
+    }
+    try {
+      await saveDraft();
+      alert('Draft saved. Open Quotations to see it.');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not save the draft');
+    }
+  };
+
+  const handleIssueAndEmail = async () => {
+    setIsGenerating(true);
+    try {
+      if (!quotationId) await generateQuotationId();
+      const id = useQuotationStore.getState().quotationId;
+      if (!['sent', 'viewed', 'accepted', 'rejected', 'expired', 'converted'].includes(status)) {
+        await saveDraft();
+      }
+      const issued = await apiJson(`/api/quotations/${id}/issue`, { method: 'POST' });
+      setLifecycle({
+        status: issued.status,
+        publicToken: issued.publicToken,
+        issuedAt: issued.issuedAt,
+        isDraft: false,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const blob = await generatePDF('pdf-content', `${id}.pdf`, { ...pdfOptions, download: false });
+      const pdfBase64 = await blobToBase64(blob);
+      const link = publicQuotationUrl(issued.publicToken || '');
+      try {
+        await apiJson(`/api/quotations/${id}/email`, {
+          method: 'POST',
+          body: JSON.stringify({
+            to: clientInfo.clientEmail,
+            pdfBase64,
+            appUrl: window.location.origin,
+            message: 'Please review this quotation and accept or reject it from the link below.',
+          }),
+        });
+        alert(`Quotation issued and emailed.\n${link}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Email failed';
+        alert(`${message}\nPublic link:\n${link}`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not issue quotation';
+      alert(message);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const subtotal = getSubtotal();
@@ -125,7 +229,7 @@ export default function PdfPreview() {
       <div className="container mx-auto px-2 sm:px-6">
         {/* Progress Stepper */}
         <div className="max-w-6xl mx-auto mb-4 sm:mb-6">
-          <ProgressStepper currentStep={4} />
+          <ProgressStepper currentStep={3} />
         </div>
 
         <div className="max-w-5xl mx-auto mb-4 sm:mb-4">
@@ -140,6 +244,16 @@ export default function PdfPreview() {
               >
                 <Download className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="text-sm sm:text-base">{isGenerating ? 'Generating...' : 'Download PDF & Save'}</span>
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleIssueAndEmail}
+                disabled={isGenerating}
+                className="bg-cravora-purple text-white px-4 sm:px-6 py-3 rounded-lg font-medium hover:bg-cravora-purple-dark transition w-full sm:w-auto disabled:opacity-50"
+              >
+                <span className="text-sm sm:text-base">{publicToken ? 'Resend email' : 'Issue & email'}</span>
               </motion.button>
 
               <motion.button
@@ -179,7 +293,7 @@ export default function PdfPreview() {
                   </label>
                   <select
                     value={pdfOptions.quality}
-                    onChange={(e) => setPdfOptions({ ...pdfOptions, quality: e.target.value as any })}
+                    onChange={(e) => setPdfOptions({ ...pdfOptions, quality: e.target.value as 'high' | 'medium' | 'low' })}
                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="high">High (300 DPI)</option>
@@ -223,6 +337,7 @@ export default function PdfPreview() {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-5xl mx-auto bg-white rounded-xl sm:rounded-2xl shadow-lg overflow-hidden"
         >
+          <FitSheet>
           <PdfDocument
             clientInfo={clientInfo}
             modules={modules}
@@ -235,7 +350,13 @@ export default function PdfPreview() {
             grandTotal={grandTotal}
             termsAndConditions={termsAndConditions}
             documentType={documentType}
+            issuedAt={issuedAt}
+            validUntil={validUntil}
+            notes={notes}
+            gstDetails={gstDetails}
+            includeSignature={pdfOptions.includeSignature}
           />
+          </FitSheet>
         </motion.div>
       </div>
     </div>

@@ -1,0 +1,21 @@
+---
+description: Secrets, data, API compatibility, and dependency limits
+alwaysApply: true
+---
+
+# Safety
+
+- Never print, hardcode, or commit API keys, passwords, tokens, or secrets. `MONGODB_URI` and `PORT` stay in the environment via dotenv.
+- `.env` is gitignored. Never commit it or edit its values unless the user explicitly asks.
+- Never delete production data. Do not drop databases or collections, and do not run other destructive MongoDB commands, without explicit approval.
+- `DELETE /api/quotations/:id` removes one document by `quotationId`. Do not widen that behavior.
+- Local MongoDB (`127.0.0.1/cravora_quotations`) and any `MONGODB_URI` database are not the same. Do not assume their data matches.
+- Do not change unrelated features or refactor code that the task does not need.
+- Do not change `/api/quotations` contracts or the `Quotation` schema until frontend `fetch` callers and `quotationStore.ts` are checked. Keep existing clients working.
+- Do not add dependencies unless the current stack cannot do the task. nodemailer is the mail dependency.
+- Stop and ask before destructive or risky operations (data deletion, schema changes, force git operations).
+- Do not print stack traces, MongoDB URIs, or SMTP settings in API responses.
+- Public quotation routes identify a document only by its random `publicToken`. They cannot set totals, invoice status, payment status, or internal notes.
+- Generic quotation and invoice updates cannot set lifecycle, token, snapshot, acceptance, or payment fields.
+- Recorded payments must be a positive amount and must not exceed the server-calculated balance.
+- New schema fields stay optional so existing quotation documents still load. Do not rewrite or delete existing rows from application code.

@@ -27,7 +27,9 @@ export default function Modules() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const limit = e.target.name === 'name' ? 60 : e.target.name === 'description' ? 90 : 0;
+    const value = limit > 0 ? e.target.value.slice(0, limit) : e.target.value;
+    setFormData({ ...formData, [e.target.name]: value });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -58,8 +60,8 @@ export default function Modules() {
 
   const handleEdit = (module: Module) => {
     setFormData({
-      name: module.name,
-      description: module.description,
+      name: module.name.slice(0, 60),
+      description: (module.description || '').slice(0, 90),
       hours: module.hours.toString(),
       rate: module.rate.toString(),
     });
@@ -70,9 +72,13 @@ export default function Modules() {
     deleteModule(id);
   };
 
-  const handleSaveDraft = () => {
-    saveDraft();
-    alert('Draft saved successfully!');
+  const handleSaveDraft = async () => {
+    try {
+      await saveDraft();
+      alert('Draft saved. Open Quotations to see it.');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not save the draft');
+    }
   };
 
   const handleNext = () => {
@@ -127,9 +133,11 @@ export default function Modules() {
                     value={formData.name}
                     onChange={handleChange}
                     required
+                    maxLength={60}
                     className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
                     placeholder="e.g., User Authentication System"
                   />
+                  <p className="mt-1 text-xs text-gray-500">{formData.name.length}/60 characters. One line keeps the PDF table on the page.</p>
                 </div>
 
                 <div>
@@ -141,9 +149,11 @@ export default function Modules() {
                     value={formData.description}
                     onChange={handleChange}
                     rows={2}
+                    maxLength={90}
                     className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none text-sm sm:text-base"
                     placeholder="Optional module description"
                   />
+                  <p className="mt-1 text-xs text-gray-500">{formData.description.length}/90 characters.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">

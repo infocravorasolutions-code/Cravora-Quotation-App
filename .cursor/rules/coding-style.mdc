@@ -1,0 +1,36 @@
+---
+description: Match existing React and Express coding patterns
+globs: "**/*.{ts,tsx,js}"
+alwaysApply: false
+---
+
+# Coding style
+
+Match this repo. Do not introduce a new structure.
+
+## Names and files
+
+- Pages and components: PascalCase file and function, default export (`export default function History`).
+- Hooks: `use` prefix, file `useAutoSave.ts`. Utils: camelCase exports in `src/utils/`.
+- Store hook: `useQuotationStore`. Interfaces in the store file: `Module`, `ClientInfo`, `GSTDetails`, `QuotationState`.
+- Backend files are lowercase (`server.js`, `quotations.js`). Model name is `Quotation`. Nested line items use `ModuleSchema`.
+- Route handlers are anonymous `async (req, res)` on an Express `Router`. Shared money math, numbering, and audit live in `backend/utils/`. Email lives in `backend/services/mailer.js`. Do not add more service layers.
+- Frontend indent is 2 spaces. Backend indent is 4 spaces. Backend is CommonJS.
+
+## State, UI, validation
+
+- Quotation data lives in Zustand. Page-only UI state uses `useState`. Navigation uses `useNavigate`.
+- Forms use controlled inputs and `handleChange` from `e.target.name`. Required client and module fields use the HTML `required` attribute.
+- Server validation is the Mongoose schema (`quotationId` required and unique; module `id`, `name`, `hours`, `rate`, `total` required) plus the POST `quotationId` check. `runValidators: true` on update.
+- Tailwind utility classes on elements. Icons from `lucide-react`. Page enter/hover motion from `framer-motion`.
+- User notices use `alert` and `confirm`. Failures use `console.error`.
+
+## API errors
+
+- `try/catch` in each route. JSON body `{ message }`. `400` validation or duplicate id, `404` missing quotation, `500` read/delete failures, `201` on create.
+- Frontend checks `res.ok` before `res.json()`. Do not add a new HTTP client.
+
+## Lint and tests
+
+- ESLint flat config covers `**/*.{ts,tsx}` only (`eslint.config.js`). After TS edits, run `npm run lint` and `npm run typecheck`.
+- Backend `npm test` is a placeholder that exits 1. Do not add a test framework unless asked. There are no existing tests to extend.

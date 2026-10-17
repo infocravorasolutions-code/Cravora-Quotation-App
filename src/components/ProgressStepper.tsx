@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Check, User, Package, FileText, Download } from 'lucide-react';
+import { Check, User, Package, FileText } from 'lucide-react';
 
 interface ProgressStepperProps {
   currentStep: number;
@@ -9,32 +9,25 @@ interface ProgressStepperProps {
 const steps = [
   {
     id: 1,
-    name: 'Client Details',
-    description: 'Enter client information',
+    name: 'Client & project',
+    description: 'Who the quote is for',
     icon: User,
     path: '/'
   },
   {
     id: 2,
-    name: 'Modules',
-    description: 'Add services & pricing',
+    name: 'Items & price',
+    description: 'Services, hours, and rates',
     icon: Package,
     path: '/modules'
   },
   {
     id: 3,
-    name: 'Summary',
-    description: 'Review & configure',
+    name: 'Review & send',
+    description: 'Discount, GST, and preview',
     icon: FileText,
     path: '/summary'
   },
-  {
-    id: 4,
-    name: 'PDF Preview',
-    description: 'Generate & download',
-    icon: Download,
-    path: '/pdf-preview'
-  }
 ];
 
 export default function ProgressStepper({ currentStep, onStepClick }: ProgressStepperProps) {
@@ -43,7 +36,7 @@ export default function ProgressStepper({ currentStep, onStepClick }: ProgressSt
       {/* Mobile: Vertical layout for small screens */}
       <div className="block sm:hidden">
         <div className="space-y-4">
-          {steps.map((step, index) => {
+          {steps.map((step) => {
             const isCompleted = currentStep > step.id;
             const isCurrent = currentStep === step.id;
             const isClickable = onStepClick && (isCompleted || isCurrent);
