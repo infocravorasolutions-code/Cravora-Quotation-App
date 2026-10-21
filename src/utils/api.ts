@@ -1,7 +1,22 @@
-/** Empty in production = same origin (Nginx proxies /api). Local dev defaults to :5001. */
-export const API_BASE =
-  (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') ??
-  (import.meta.env.DEV ? 'http://localhost:5001' : '');
+const rawBase = (import.meta.env.VITE_API_BASE as string | undefined)?.trim();
+/** Base URL for API calls. Normalized without trailing slash or duplicate /api. */
+export const API_BASE = (rawBase || (import.meta.env.DEV ? 'http://localhost:5001' : ''))
+  .replace(/\/+$/, '')
+  .replace(/\/api$/i, '');
+
+/**
+ * Builds a safe, canonical URL for any API endpoint.
+ * Ensures the path starts with /api and never duplicates /api even if present in VITE_API_BASE.
+ */
+export function apiUrl(path: string): string {
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const apiPath = cleanPath.startsWith('/api/') || cleanPath === '/api'
+    ? cleanPath
+    : `/api${cleanPath}`;
+  return API_BASE ? `${API_BASE}${apiPath}` : apiPath;
+}
+
 
 export interface ApiRecord {
   message?: string;
@@ -63,10 +78,11 @@ export function authHeaders(init?: HeadersInit) {
 
 export async function apiJson(path: string, options: RequestInit = {}): Promise<ApiRecord> {
   const headers = authHeaders(options.headers);
-  if (options.body && !headers.has('Content-Type')) {
+  if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const url = apiUrl(path);
+  const res = await fetch(url, { ...options, headers });
   const text = await res.text();
   const data = (text ? JSON.parse(text) : {}) as ApiRecord;
   if (res.status === 401 && !path.startsWith('/api/auth/login') && !path.startsWith('/api/auth/setup')) {

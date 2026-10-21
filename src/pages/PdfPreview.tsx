@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Download, Save, Settings } from 'lucide-react';
 import { useQuotationStore } from '../store/quotationStore';
 import { generatePDF, PDFOptions } from '../utils/pdfGenerator';
-import { API_BASE, apiJson, authHeaders, blobToBase64, publicQuotationUrl } from '../utils/api';
+import { apiUrl, apiJson, authHeaders, blobToBase64, publicQuotationUrl } from '../utils/api';
 import { useLayoutEffect, useRef, useState } from 'react';
 import ProgressStepper from '../components/ProgressStepper';
 import PdfDocument from '../components/PdfDocument';
@@ -128,16 +128,16 @@ export default function PdfPreview() {
       };
 
       const headers = authHeaders({ 'Content-Type': 'application/json' });
-      const res = await fetch(`${API_BASE}/api/quotations/${quotationId}`, { headers: authHeaders() });
+      const res = await fetch(apiUrl(`/api/quotations/${quotationId}`), { headers: authHeaders() });
       let saved: Response;
       if (res.ok) {
-        saved = await fetch(`${API_BASE}/api/quotations/${quotationId}`, {
+        saved = await fetch(apiUrl(`/api/quotations/${quotationId}`), {
           method: 'PUT',
           headers,
           body: JSON.stringify(quotation),
         });
       } else if (res.status === 404) {
-        saved = await fetch(`${API_BASE}/api/quotations`, {
+        saved = await fetch(apiUrl('/api/quotations'), {
           method: 'POST',
           headers,
           body: JSON.stringify(quotation),

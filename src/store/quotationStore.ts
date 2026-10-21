@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { API_BASE, authHeaders } from '../utils/api';
+import { apiUrl, authHeaders } from '../utils/api';
 
 export interface Module {
   id: string;
@@ -259,7 +259,7 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
     if (!force && get().quotationId) return;
     const state = get();
     try {
-      const res = await fetch(`${API_BASE}/api/quotations/next-number`, {
+      const res = await fetch(apiUrl('/api/quotations/next-number'), {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ documentType: state.documentType }),
@@ -302,9 +302,9 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
     };
 
     const headers = authHeaders({ 'Content-Type': 'application/json' });
-    const existingRes = await fetch(`${API_BASE}/api/quotations/${draftId}`, { headers: authHeaders() });
+    const existingRes = await fetch(apiUrl(`/api/quotations/${draftId}`), { headers: authHeaders() });
     if (existingRes.ok) {
-      const updated = await fetch(`${API_BASE}/api/quotations/${draftId}`, {
+      const updated = await fetch(apiUrl(`/api/quotations/${draftId}`), {
         method: 'PUT',
         headers,
         body: JSON.stringify(draft),
@@ -314,7 +314,7 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
         throw new Error(data.message || 'Could not save the draft');
       }
     } else if (existingRes.status === 404) {
-      const created = await fetch(`${API_BASE}/api/quotations`, {
+      const created = await fetch(apiUrl('/api/quotations'), {
         method: 'POST',
         headers,
         body: JSON.stringify(draft),
@@ -333,7 +333,7 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
   loadDraft: async (draftId: string) => {
     const state = get();
     try {
-      const res = await fetch(`${API_BASE}/api/quotations/${draftId}`, { headers: authHeaders() });
+      const res = await fetch(apiUrl(`/api/quotations/${draftId}`), { headers: authHeaders() });
       if (res.ok) {
         const draft = await res.json();
         set({

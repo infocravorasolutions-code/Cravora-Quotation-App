@@ -8,7 +8,7 @@ import { formatCurrency } from '../utils/currency';
 import { useQuotationStore, type ClientInfo, type Module } from '../store/quotationStore';
 import { generatePDF } from '../utils/pdfGenerator';
 import PdfDocument from '../components/PdfDocument';
-import { API_BASE, apiJson, blobToBase64, publicQuotationUrl } from '../utils/api';
+import { apiUrl, apiJson, blobToBase64, publicQuotationUrl } from '../utils/api';
 import SectionNav from '../components/SectionNav';
 import { quotationLinks, quotationStatusLabel } from '../utils/labels';
 
@@ -59,7 +59,7 @@ export default function History() {
   const loadQuotations = async () => {
     try {
       const token = localStorage.getItem('cravora.token');
-      const res = await fetch(`${API_BASE}/api/quotations`, {
+      const res = await fetch(apiUrl('/api/quotations'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) {
@@ -132,7 +132,7 @@ export default function History() {
     if (confirm('Are you sure you want to delete this quotation?')) {
       try {
         const token = localStorage.getItem('cravora.token');
-        const res = await fetch(`${API_BASE}/api/quotations/${id}`, {
+        const res = await fetch(apiUrl(`/api/quotations/${id}`), {
           method: 'DELETE',
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });

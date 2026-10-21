@@ -22,9 +22,9 @@ const PORT = process.env.PORT || 5001;
 const corsOriginEnv = process.env.CORS_ORIGIN;
 const corsOrigin = !corsOriginEnv || corsOriginEnv === 'true'
     ? true
-    : corsOriginEnv.split(',').map((value) => value.trim());
+    : corsOriginEnv.split(',').map((value) => value.trim().replace(/\/+$/, ''));
 
-app.use(cors({ origin: corsOrigin }));
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json({ limit: '25mb' }));
 
 app.use('/api/auth', authRouter);
