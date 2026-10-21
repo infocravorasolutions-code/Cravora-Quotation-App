@@ -3,6 +3,8 @@ const router = express.Router();
 const Invoice = require('../models/Invoice');
 const Payment = require('../models/Payment');
 const Client = require('../models/Client');
+const Quotation = require('../models/Quotation');
+const Receipt = require('../models/Receipt');
 const { isEmail } = require('../utils/totals');
 const { logAudit } = require('../utils/audit');
 const { documentEmailHtml, sendDocumentEmail } = require('../services/mailer');
@@ -198,6 +200,93 @@ router.post('/:invoiceNumber/cancel', async (req, res) => {
         res.json(invoice);
     } catch (err) {
         res.status(400).json({ message: 'Could not cancel invoice' });
+    }
+});
+
+router.put('/:invoiceNumber', async (req, res) => {
+    try {
+        const invoice = await Invoice.findOne({ invoiceNumber: req.params.invoiceNumber });
+        if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+
+        const body = req.body || {};
+        if (body.dueDate) {
+            const d = new Date(body.dueDate);
+            if (!Number.isNaN(d.getTime())) invoice.dueDate = d;
+        }
+        if (body.issueDate) {
+            const d = new Date(body.issueDate);
+            if (!Number.isNaN(d.getTime())) invoice.issueDate = d;
+        }
+        if (body.notes != null) invoice.notes = String(body.notes);
+        if (Array.isArray(body.terms)) invoice.terms = body.terms;
+        if (body.clientSnapshot && typeof body.clientSnapshot === 'object') {
+            invoice.clientSnapshot = { ...invoice.clientSnapshot, ...body.clientSnapshot };
+        }
+        if (Array.isArray(body.items) && body.items.length > 0) {
+            invoice.items = body.items;
+            const subtotal = invoice.items.reduce((s, it) => s + (Number(it.total) || 0), 0);
+            const discountRate = body.discountRate !== undefined ? Number(body.discountRate) : (invoice.discountRate || 0);
+            const discountAmount = (subtotal * discountRate) / 100;
+            const tax = body.tax !== undefined ? Number(body.tax) : (invoice.tax || 0);
+            const taxAmount = ((subtotal - discountAmount) * tax) / 100;
+            const grandTotal = subtotal - discountAmount + taxAmount;
+            invoice.subtotal = subtotal;
+            invoice.discountRate = discountRate;
+            invoice.discountAmount = discountAmount;
+            invoice.tax = tax;
+            invoice.taxAmount = taxAmount;
+            invoice.grandTotal = grandTotal;
+            invoice.balanceDue = Math.max(0, grandTotal - (invoice.amountPaid || 0));
+        } else if (body.discountRate !== undefined) {
+            invoice.discountRate = Number(body.discountRate);
+            invoice.discountAmount = ((invoice.subtotal || 0) * invoice.discountRate) / 100;
+            const taxable = (invoice.subtotal || 0) - invoice.discountAmount;
+            invoice.taxAmount = (taxable * (invoice.tax || 0)) / 100;
+            invoice.grandTotal = taxable + invoice.taxAmount;
+            invoice.balanceDue = Math.max(0, invoice.grandTotal - (invoice.amountPaid || 0));
+        }
+        if (body.gstDetails) invoice.gstDetails = body.gstDetails;
+
+        if (invoice.issuedSnapshot) {
+            invoice.issuedSnapshot = snapshotFrom(invoice);
+        }
+
+        await invoice.save();
+        await logAudit('invoice_updated', 'invoice', invoice.invoiceNumber, {
+            grandTotal: invoice.grandTotal,
+        });
+        res.json(invoice);
+    } catch (err) {
+        res.status(400).json({ message: err.message || 'Could not update invoice' });
+    }
+});
+
+router.delete('/:invoiceNumber', async (req, res) => {
+    try {
+        const invoice = await Invoice.findOne({ invoiceNumber: req.params.invoiceNumber });
+        if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+
+        const paymentsCount = await Payment.countDocuments({ invoiceId: invoice.invoiceNumber, status: 'recorded' });
+        if (paymentsCount > 0) {
+            return res.status(400).json({
+                message: `Cannot delete invoice ${invoice.invoiceNumber} because it has ${paymentsCount} recorded payment(s). Delete the payments first.`,
+            });
+        }
+
+        await Receipt.deleteMany({ invoiceId: invoice.invoiceNumber });
+
+        if (invoice.quotationId) {
+            await Quotation.findOneAndUpdate(
+                { quotationId: invoice.quotationId, status: 'converted' },
+                { status: 'final' }
+            );
+        }
+
+        await Invoice.deleteOne({ invoiceNumber: invoice.invoiceNumber });
+        await logAudit('invoice_deleted', 'invoice', invoice.invoiceNumber, {});
+        res.json({ message: `Invoice ${invoice.invoiceNumber} deleted successfully` });
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Could not delete invoice' });
     }
 });
 

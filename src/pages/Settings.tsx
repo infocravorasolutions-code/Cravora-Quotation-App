@@ -12,10 +12,56 @@ export default function Settings() {
   const [mailError, setMailError] = useState('');
   const [mailBusy, setMailBusy] = useState(false);
   const [role, setRole] = useState('admin');
-  const [users, setUsers] = useState<Array<{ email: string; role: string }>>([]);
-  const [newUser, setNewUser] = useState({ email: '', password: '' });
+  const [users, setUsers] = useState<Array<{ _id?: string; email: string; role: string }>>([]);
+  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'accounts' });
+  const [editingUser, setEditingUser] = useState<{ _id: string; email: string; role: string } | null>(null);
+  const [editRole, setEditRole] = useState('accounts');
+  const [editPassword, setEditPassword] = useState('');
   const [userMessage, setUserMessage] = useState('');
   const [userError, setUserError] = useState('');
+
+  const reloadUsers = async () => {
+    try {
+      const data = await apiJson('/api/auth/users');
+      setUsers((data.items || []) as Array<{ _id: string; email: string; role: string }>);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser?._id) return;
+    setUserError('');
+    setUserMessage('');
+    try {
+      const body: Record<string, string> = { role: editRole };
+      if (editPassword) body.password = editPassword;
+      await apiJson(`/api/auth/users/${editingUser._id}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+      setUserMessage(`User ${editingUser.email} updated.`);
+      setEditingUser(null);
+      setEditPassword('');
+      await reloadUsers();
+    } catch (err) {
+      setUserError(err instanceof Error ? err.message : 'Could not update user');
+    }
+  };
+
+  const handleDeleteUser = async (user: { _id?: string; email: string }) => {
+    if (!user._id) return;
+    if (!confirm(`Are you sure you want to delete user ${user.email}?`)) return;
+    setUserError('');
+    setUserMessage('');
+    try {
+      await apiJson(`/api/auth/users/${user._id}`, { method: 'DELETE' });
+      setUserMessage(`User ${user.email} deleted.`);
+      await reloadUsers();
+    } catch (err) {
+      setUserError(err instanceof Error ? err.message : 'Could not delete user');
+    }
+  };
 
   useEffect(() => {
     apiJson('/api/settings/smtp').then((data) => {
@@ -135,31 +181,149 @@ export default function Settings() {
           {role === 'admin' && (
             <div className="space-y-4 border-b border-gray-100 pb-6">
               <h2 className="text-lg font-semibold text-gray-800">Team</h2>
-              <p className="text-sm text-gray-500">Add the other partner as an accounts user. Both people share this company. No ownership split is stored.</p>
-              <ul className="text-sm">
-                {users.map((user) => <li key={user.email}>{user.email} · {user.role}</li>)}
-              </ul>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <p className="text-sm text-gray-500">Manage user access and roles for your organization.</p>
+
+              <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-600">
+                    <tr>
+                      <th className="px-4 py-3">Email</th>
+                      <th className="px-4 py-3">Role</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {users.map((user) => (
+                      <tr key={user.email} className="hover:bg-purple-50/30">
+                        <td className="px-4 py-3 font-medium text-gray-800">{user.email}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                            user.role === 'accounts' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right space-x-2">
+                          <button
+                            type="button"
+                            className="text-cravora-purple hover:underline text-xs font-medium"
+                            onClick={() => {
+                              setEditingUser(user as { _id: string; email: string; role: string });
+                              setEditRole(user.role);
+                              setEditPassword('');
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="text-red-600 hover:underline text-xs font-medium"
+                            onClick={() => handleDeleteUser(user)}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {users.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-3 text-center text-gray-500">No team members found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Edit User Modal / Box */}
+              {editingUser && (
+                <div className="p-4 bg-purple-50/60 border border-purple-100 rounded-xl space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-800">Edit User: {editingUser.email}</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                      <select
+                        value={editRole}
+                        onChange={(e) => setEditRole(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                      >
+                        <option value="admin">admin</option>
+                        <option value="accounts">accounts</option>
+                        <option value="viewer">viewer</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Reset Password (leave empty to keep)</label>
+                      <input
+                        type="password"
+                        placeholder="New password (optional)"
+                        value={editPassword}
+                        onChange={(e) => setEditPassword(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="bg-cravora-purple text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-cravora-purple-dark transition"
+                      onClick={handleUpdateUser}
+                    >
+                      Save Changes
+                    </button>
+                    <button
+                      type="button"
+                      className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-300 transition"
+                      onClick={() => setEditingUser(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Add User Section */}
+              <h3 className="text-sm font-semibold text-gray-800 pt-2">Add New Member</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Field label="Email" value={newUser.email} onChange={(value) => setNewUser({ ...newUser, email: value })} />
                 <Field label="Password" type="password" value={newUser.password} onChange={(value) => setNewUser({ ...newUser, password: value })} />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Role</label>
+                  <select
+                    value={newUser.role}
+                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                  >
+                    <option value="accounts">accounts</option>
+                    <option value="admin">admin</option>
+                    <option value="viewer">viewer</option>
+                  </select>
+                </div>
               </div>
               {userError && <p className="text-sm text-red-600">{userError}</p>}
               {userMessage && <p className="text-sm text-green-700">{userMessage}</p>}
-              <button type="button" className="bg-gray-800 text-white px-4 py-2 rounded-lg" onClick={async () => {
-                setUserError('');
-                setUserMessage('');
-                try {
-                  const created = await apiJson('/api/auth/users', {
-                    method: 'POST',
-                    body: JSON.stringify({ email: newUser.email, password: newUser.password, role: 'accounts' }),
-                  });
-                  setUsers((current) => [...current, { email: created.email || newUser.email, role: created.role || 'accounts' }]);
-                  setNewUser({ email: '', password: '' });
-                  setUserMessage('Accounts user added.');
-                } catch (err) {
-                  setUserError(err instanceof Error ? err.message : 'Could not add the user');
-                }
-              }}>Add accounts user</button>
+              <button
+                type="button"
+                className="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-900 transition"
+                onClick={async () => {
+                  setUserError('');
+                  setUserMessage('');
+                  try {
+                    const created = await apiJson('/api/auth/users', {
+                      method: 'POST',
+                      body: JSON.stringify({ email: newUser.email, password: newUser.password, role: newUser.role }),
+                    });
+                    setUsers((current) => [...current, { _id: created._id, email: created.email || newUser.email, role: created.role || newUser.role }]);
+                    setNewUser({ email: '', password: '', role: 'accounts' });
+                    setUserMessage('Team member added.');
+                  } catch (err) {
+                    setUserError(err instanceof Error ? err.message : 'Could not add the user');
+                  }
+                }}
+              >
+                Add Member
+              </button>
             </div>
           )}
 

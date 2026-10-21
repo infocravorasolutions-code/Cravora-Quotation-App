@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { Download, Mail, Search, Send, XCircle, FileText } from 'lucide-react';
+import { Download, Mail, Search, Send, XCircle, FileText, MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import PdfDocument from '../components/PdfDocument';
 import SectionNav from '../components/SectionNav';
+import WhatsAppModal from '../components/WhatsAppModal';
 import { generatePDF } from '../utils/pdfGenerator';
 import { apiJson, asBody, asItems, blobToBase64 } from '../utils/api';
 import { formatCurrency } from '../utils/currency';
@@ -67,6 +68,12 @@ export default function Invoices() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<(InvoiceRecord & { source: InvoiceRecord }) | null>(null);
+  const [whatsappInvoice, setWhatsappInvoice] = useState<InvoiceRecord | null>(null);
+  const [whatsappPdfBase64, setWhatsappPdfBase64] = useState('');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [isGeneratingWhatsApp, setIsGeneratingWhatsApp] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceRecord | null>(null);
+  const [editForm, setEditForm] = useState({ dueDate: '', notes: '', discountRate: 0, terms: '' });
 
   const load = async () => {
     const data = await apiJson(`/api/invoices?limit=50&q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`);
@@ -92,6 +99,47 @@ export default function Invoices() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not issue invoice');
+    }
+  };
+
+  const startEdit = (inv: InvoiceRecord) => {
+    setEditingInvoice(inv);
+    setEditForm({
+      dueDate: inv.dueDate ? new Date(inv.dueDate).toISOString().slice(0, 10) : '',
+      notes: inv.notes || '',
+      discountRate: inv.discountRate || 0,
+      terms: (inv.terms || []).join('\n'),
+    });
+  };
+
+  const saveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInvoice) return;
+    setError('');
+    try {
+      await apiJson(`/api/invoices/${editingInvoice.invoiceNumber}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          dueDate: editForm.dueDate || undefined,
+          notes: editForm.notes,
+          discountRate: Number(editForm.discountRate) || 0,
+          terms: editForm.terms.split('\n').map((t) => t.trim()).filter(Boolean),
+        }),
+      });
+      setEditingInvoice(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save invoice');
+    }
+  };
+
+  const deleteInvoice = async (invoiceNumber: string) => {
+    if (!confirm(`Are you sure you want to delete invoice ${invoiceNumber}? This action cannot be undone.`)) return;
+    try {
+      await apiJson(`/api/invoices/${invoiceNumber}`, { method: 'DELETE' });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete invoice');
     }
   };
 
@@ -124,6 +172,38 @@ export default function Invoices() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not email invoice');
     } finally {
+      setPreview(null);
+    }
+  };
+
+  const openWhatsApp = async (invoice: InvoiceRecord) => {
+    setError('');
+    setIsGeneratingWhatsApp(true);
+    try {
+      const current = invoice.issuedSnapshot
+        ? invoice
+        : asBody<InvoiceRecord>(await apiJson(`/api/invoices/${invoice.invoiceNumber}/issue`, { method: 'POST' }));
+      let suggestedPhone = '';
+      if (current.clientId) {
+        try {
+          const client = await apiJson(`/api/clients/${current.clientId}`);
+          if (client.mobile) suggestedPhone = String(client.mobile).trim();
+        } catch {
+          // ignore
+        }
+      }
+      const source = current.issuedSnapshot || current;
+      setPreview({ ...invoice, source });
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const blob = await generatePDF('invoice-pdf', `${invoice.invoiceNumber}.pdf`, { download: false });
+      const base64 = await blobToBase64(blob);
+      setWhatsappPhone(suggestedPhone);
+      setWhatsappPdfBase64(base64);
+      setWhatsappInvoice(current);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not prepare invoice for WhatsApp');
+    } finally {
+      setIsGeneratingWhatsApp(false);
       setPreview(null);
     }
   };
@@ -268,15 +348,37 @@ export default function Invoices() {
                           <button className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800" title="Email invoice" onClick={() => email(invoice)}>
                             <Mail className="h-4 w-4" />
                           </button>
+                          <button
+                            className="rounded-lg p-2 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
+                            title="Send via WhatsApp"
+                            disabled={isGeneratingWhatsApp}
+                            onClick={() => openWhatsApp(invoice)}
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </button>
+                          <button
+                            className="rounded-lg p-2 text-purple-600 hover:bg-purple-50 hover:text-purple-700"
+                            title="Edit invoice"
+                            onClick={() => startEdit(invoice)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
                           {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
                             <button
-                              className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                              className="rounded-lg p-2 text-gray-400 hover:bg-amber-50 hover:text-amber-600"
                               title="Cancel invoice"
                               onClick={() => apiJson(`/api/invoices/${invoice.invoiceNumber}/cancel`, { method: 'POST' }).then(load).catch((err) => setError(err.message))}
                             >
                               <XCircle className="h-4 w-4" />
                             </button>
                           )}
+                          <button
+                            className="rounded-lg p-2 text-red-500 hover:bg-red-50 hover:text-red-700"
+                            title="Delete invoice"
+                            onClick={() => deleteInvoice(invoice.invoiceNumber)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -311,6 +413,103 @@ export default function Invoices() {
           />
         </div>,
         document.body
+      )}
+      {whatsappInvoice && (
+        <WhatsAppModal
+          isOpen={Boolean(whatsappInvoice)}
+          onClose={() => setWhatsappInvoice(null)}
+          quotationId={whatsappInvoice.invoiceNumber}
+          documentType="Invoice"
+          initialPhone={whatsappPhone}
+          clientName={whatsappInvoice.clientSnapshot?.clientName}
+          grandTotal={whatsappInvoice.grandTotal}
+          currency={currencyOf(whatsappInvoice)}
+          isDraft={whatsappInvoice.status === 'draft'}
+          pdfBase64={whatsappPdfBase64}
+          filename={`${whatsappInvoice.invoiceNumber}.pdf`}
+          onSuccess={(notice) => alert(notice)}
+        />
+      )}
+      {editingInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-lg font-bold text-gray-800">Edit Invoice {editingInvoice.invoiceNumber}</h3>
+              <button
+                type="button"
+                className="text-gray-400 hover:text-gray-600 text-lg font-bold p-1"
+                onClick={() => setEditingInvoice(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={saveEdit} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={editForm.dueDate}
+                  onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">
+                  Discount Rate (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={editForm.discountRate}
+                  onChange={(e) => setEditForm({ ...editForm, discountRate: Number(e.target.value) })}
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  rows={2}
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  placeholder="Notes for client"
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">
+                  Terms & Conditions (one per line)
+                </label>
+                <textarea
+                  rows={3}
+                  value={editForm.terms}
+                  onChange={(e) => setEditForm({ ...editForm, terms: e.target.value })}
+                  className="w-full rounded-lg border px-3 py-2 text-sm font-mono text-xs focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  className="rounded-lg border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                  onClick={() => setEditingInvoice(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-cravora-purple px-4 py-2 text-sm font-semibold text-white hover:bg-cravora-purple-dark"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

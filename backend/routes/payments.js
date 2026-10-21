@@ -190,4 +190,96 @@ router.post('/:id/receipt', requireFinance, async (req, res) => {
     }
 });
 
+router.put('/:id', requireFinance, async (req, res) => {
+    try {
+        const payment = await Payment.findById(req.params.id);
+        if (!payment) return res.status(404).json({ message: 'Payment not found' });
+
+        const body = req.body || {};
+        if (body.amount !== undefined) {
+            const amt = round2(body.amount);
+            if (!Number.isFinite(amt) || amt <= 0) return res.status(400).json({ message: 'Invalid payment amount' });
+            payment.amount = amt;
+        }
+        if (body.paymentDate) {
+            const d = new Date(body.paymentDate);
+            if (!Number.isNaN(d.getTime())) payment.paymentDate = d;
+        }
+        if (body.paymentMethod && METHODS.includes(body.paymentMethod)) {
+            payment.paymentMethod = body.paymentMethod;
+        }
+        if (body.transactionReference !== undefined) {
+            payment.transactionReference = String(body.transactionReference).slice(0, 120);
+        }
+        if (body.notes !== undefined) {
+            payment.notes = String(body.notes).slice(0, 1000);
+        }
+        if (body.accountId) {
+            const account = await Account.findById(body.accountId);
+            if (account && account.isActive !== false) payment.accountId = account._id;
+        }
+
+        await payment.save();
+
+        let updatedInvoice = null;
+        if (payment.invoiceId) {
+            const invoice = await Invoice.findOne({ invoiceNumber: payment.invoiceId });
+            if (invoice) {
+                await applyPaymentStatus(invoice);
+                await invoice.save();
+                updatedInvoice = invoice;
+
+                await Receipt.updateMany(
+                    { paymentId: payment._id },
+                    {
+                        $set: {
+                            amount: payment.amount,
+                            paymentDate: payment.paymentDate,
+                            paymentMethod: payment.paymentMethod,
+                            transactionReference: payment.transactionReference,
+                            amountPaid: invoice.amountPaid,
+                            balanceDue: invoice.balanceDue,
+                        }
+                    }
+                );
+            }
+        }
+
+        await logAudit('payment_updated', 'payment', String(payment._id), {
+            amount: payment.amount,
+        });
+        res.json({ payment, invoice: updatedInvoice });
+    } catch (err) {
+        res.status(400).json({ message: err.message || 'Could not update payment' });
+    }
+});
+
+router.delete('/:id', requireFinance, async (req, res) => {
+    try {
+        const payment = await Payment.findById(req.params.id);
+        if (!payment) return res.status(404).json({ message: 'Payment not found' });
+
+        await Receipt.deleteMany({ paymentId: payment._id });
+
+        const invoiceId = payment.invoiceId;
+        await Payment.findByIdAndDelete(payment._id);
+
+        if (invoiceId) {
+            const invoice = await Invoice.findOne({ invoiceNumber: invoiceId });
+            if (invoice) {
+                await applyPaymentStatus(invoice);
+                await invoice.save();
+            }
+        }
+
+        await logAudit('payment_deleted', 'payment', String(payment._id), {
+            invoiceId,
+            amount: payment.amount,
+        });
+        res.json({ message: 'Payment deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Could not delete payment' });
+    }
+});
+
 module.exports = router;

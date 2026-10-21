@@ -9,17 +9,23 @@ import { useAutoSave } from '../hooks/useAutoSave';
 
 export default function ClientDetails() {
   const navigate = useNavigate();
-  const { clientInfo, setClientInfo, generateQuotationId, saveDraft, clientId, setClientId } = useQuotationStore();
+  const { clientInfo, setClientInfo, generateQuotationId, saveDraft, clientId, setClientId, quotationId } = useQuotationStore();
 
   const [formData, setFormData] = useState(clientInfo);
-  const [clients, setClients] = useState<Array<{ _id: string; companyName: string; email: string; gstin?: string; billingAddress?: string; shippingAddress?: string }>>([]);
+  const [clients, setClients] = useState<Array<{ _id: string; companyName: string; email: string; mobile?: string; gstin?: string; billingAddress?: string; shippingAddress?: string }>>([]);
 
   // Auto-save functionality
   useAutoSave(30000); // Auto-save every 30 seconds
 
   useEffect(() => {
-    generateQuotationId();
-  }, [generateQuotationId]);
+    if (!quotationId) {
+      generateQuotationId();
+    }
+  }, [generateQuotationId, quotationId]);
+
+  useEffect(() => {
+    setFormData(clientInfo);
+  }, [quotationId]);
 
   useEffect(() => {
     apiJson('/api/clients?limit=100')
@@ -35,6 +41,7 @@ export default function ClientDetails() {
       ...current,
       clientName: client.companyName,
       clientEmail: client.email,
+      clientMobile: client.mobile || '',
       clientAddress: client.billingAddress || '',
       clientGstNumber: client.gstin || '',
       shippingAddress: client.shippingAddress || '',
@@ -83,9 +90,16 @@ export default function ClientDetails() {
           <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-2 sm:p-6 lg:p-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 space-y-3 sm:space-y-0">
               <div>
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 mb-1 sm:mb-2">
-                  Client & Project Details
-                </h1>
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">
+                    Client & Project Details
+                  </h1>
+                  {quotationId && (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-cravora-purple">
+                      Editing: {quotationId}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs sm:text-sm lg:text-base text-gray-600">
                   Enter the basic information to get started with your quotation
                 </p>
@@ -146,6 +160,20 @@ export default function ClientDetails() {
                   required
                   className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
                   placeholder="client@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                  Client Mobile / WhatsApp (Optional)
+                </label>
+                <input
+                  type="tel"
+                  name="clientMobile"
+                  value={formData.clientMobile || ''}
+                  onChange={handleChange}
+                  className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
+                  placeholder="+91 9876543210"
                 />
               </div>
 

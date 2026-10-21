@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const router = express.Router();
 const Quotation = require('../models/Quotation');
 const Invoice = require('../models/Invoice');
+const Payment = require('../models/Payment');
 const { computeTotals, quotationContentError } = require('../utils/totals');
 const { nextDocumentNumber } = require('../utils/numbers');
 const { logAudit } = require('../utils/audit');
@@ -144,9 +145,7 @@ router.put('/:id', async (req, res) => {
     try {
         const existing = await Quotation.findOne({ quotationId: req.params.id });
         if (!existing) return res.status(404).json({ message: 'Quotation not found' });
-        if (existing.issuedSnapshot) {
-            return res.status(400).json({ message: 'Issued quotations cannot be edited' });
-        }
+        
         const updates = stripProtected(req.body || {});
         const current = displayStatus(existing);
         if (LOCKED.includes(current) && updates.isDraft === true) {
@@ -159,11 +158,38 @@ router.put('/:id', async (req, res) => {
         if (updates.isDraft === true && (current === 'draft' || !existing.status)) {
             updates.status = 'draft';
         }
+
+        // Recompute totals if modules/discount/tax/gst are updated
+        const mergedForTotals = {
+            modules: updates.modules || existing.modules || [],
+            discountRate: updates.discountRate !== undefined ? updates.discountRate : existing.discountRate,
+            tax: updates.tax !== undefined ? updates.tax : existing.tax,
+            gstDetails: updates.gstDetails || existing.gstDetails || {},
+        };
+        const totals = computeTotals(mergedForTotals);
+        updates.subtotal = totals.subtotal;
+        updates.discountAmount = totals.discountAmount;
+        updates.taxAmount = totals.taxAmount;
+        updates.tax = totals.tax;
+        updates.grandTotal = totals.grandTotal;
+        updates.gstDetails = totals.gstDetails;
+
+        // If issuedSnapshot exists, keep it updated with the edits so links and PDFs reflect changes
+        if (existing.issuedSnapshot) {
+            updates.issuedSnapshot = buildSnapshot(
+                { ...existing.toObject(), ...updates },
+                totals
+            );
+        }
+
         const updatedQuotation = await Quotation.findOneAndUpdate(
             { quotationId: req.params.id },
             updates,
             { new: true, runValidators: true }
         );
+        await logAudit('quotation_updated', 'quotation', req.params.id, {
+            grandTotal: updatedQuotation.grandTotal,
+        });
         res.json(updatedQuotation);
     } catch (err) {
         res.status(400).json({ message: err.message || 'Could not update quotation' });
@@ -275,7 +301,7 @@ router.post('/:id/convert', async (req, res) => {
         const quotation = await Quotation.findOne({ quotationId: req.params.id });
         if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
         const current = displayStatus(quotation);
-        const billingReady = quotation.documentType === 'Billing' && current === 'final';
+        const billingReady = quotation.documentType === 'Billing' && ['final', 'sent', 'viewed', 'accepted'].includes(current);
         const quoteReady = current === 'accepted' || current === 'converted';
         if (!billingReady && !quoteReady) {
             return res.status(400).json({ message: 'Only an accepted quotation or a finished bill can be converted' });
@@ -345,14 +371,24 @@ router.delete('/:id', async (req, res) => {
     try {
         const existing = await Quotation.findOne({ quotationId: req.params.id });
         if (!existing) return res.status(404).json({ message: 'Quotation not found' });
-        if (existing.issuedSnapshot || LOCKED.includes(displayStatus(existing))) {
-            return res.status(400).json({ message: 'Issued quotations cannot be deleted' });
+
+        // If an invoice is linked, prevent deletion only if payments have already been recorded
+        const linkedInvoice = await Invoice.findOne({ quotationId: req.params.id });
+        if (linkedInvoice) {
+            const paymentsCount = await Payment.countDocuments({ invoiceId: linkedInvoice.invoiceNumber, status: 'recorded' });
+            if (paymentsCount > 0) {
+                return res.status(400).json({
+                    message: `Cannot delete quotation: linked invoice ${linkedInvoice.invoiceNumber} already has recorded payments.`
+                });
+            }
+            await Invoice.deleteOne({ invoiceNumber: linkedInvoice.invoiceNumber });
         }
+
         await Quotation.findOneAndDelete({ quotationId: req.params.id });
         await logAudit('quotation_deleted', 'quotation', req.params.id, {});
-        res.json({ message: 'Quotation deleted' });
+        res.json({ message: 'Quotation deleted successfully' });
     } catch (err) {
-        res.status(500).json({ message: 'Could not delete quotation' });
+        res.status(500).json({ message: err.message || 'Could not delete quotation' });
     }
 });
 

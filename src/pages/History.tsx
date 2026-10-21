@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { Trash2, Plus, Download } from 'lucide-react';
+import { Trash2, Plus, Download, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../utils/currency';
 import { useQuotationStore, type ClientInfo, type Module } from '../store/quotationStore';
@@ -129,7 +129,7 @@ export default function History() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this quotation?')) {
+    if (confirm(`Are you sure you want to delete quotation ${id}? This action cannot be undone.`)) {
       try {
         const token = localStorage.getItem('cravora.token');
         const res = await fetch(apiUrl(`/api/quotations/${id}`), {
@@ -137,13 +137,14 @@ export default function History() {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (res.ok) {
-          setQuotations(quotations.filter((q) => q.id !== id));
+          setQuotations((prev) => prev.filter((q) => q.id !== id));
         } else {
           const data = await res.json().catch(() => ({}));
           alert(data.message || 'Failed to delete from server');
         }
       } catch (error) {
         console.error('Failed to delete quotation', error);
+        alert('Failed to delete quotation');
       }
     }
   };
@@ -385,42 +386,53 @@ export default function History() {
                         </td>
                         <td className="text-center py-4 px-4">
                           <div className="flex items-center justify-center gap-2">
-                            {quotation.status === 'draft' && (
-                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => handleEditDraft(quotation.id)}>Edit</button>
-                            )}
-                            {quotation.status === 'final' && quotation.documentType === 'Billing' && (
-                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => handleConvert(quotation)}>Create invoice</button>
-                            )}
-                            {quotation.status === 'final' && quotation.documentType !== 'Billing' && (
-                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => handleEditDraft(quotation.id)}>Edit</button>
+                            {quotation.documentType === 'Billing' && ['final', 'sent', 'viewed', 'accepted'].includes(quotation.status) && (
+                              <button type="button" className="rounded-lg bg-cravora-purple px-2.5 py-1.5 text-xs font-medium text-white hover:bg-cravora-purple-dark transition" onClick={() => handleConvert(quotation)}>Create invoice</button>
                             )}
                             {quotation.status === 'sent' && (
-                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => {
+                              <button type="button" className="rounded-lg bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition" onClick={() => {
                                 const link = quotation.publicToken ? publicQuotationUrl(quotation.publicToken) : '';
                                 if (link) navigator.clipboard.writeText(link);
                                 alert(link || 'Issue the quotation before sharing a link.');
                               }}>View link</button>
                             )}
                             {quotation.status === 'viewed' && (
-                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => handleEmail(quotation)}>Follow up</button>
+                              <button type="button" className="rounded-lg bg-cravora-purple px-2.5 py-1.5 text-xs font-medium text-white hover:bg-cravora-purple-dark transition" onClick={() => handleEmail(quotation)}>Follow up</button>
                             )}
-                            {quotation.status === 'accepted' && (
-                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => handleConvert(quotation)}>Create invoice</button>
+                            {quotation.status === 'accepted' && quotation.documentType !== 'Billing' && (
+                              <button type="button" className="rounded-lg bg-cravora-purple px-2.5 py-1.5 text-xs font-medium text-white hover:bg-cravora-purple-dark transition" onClick={() => handleConvert(quotation)}>Create invoice</button>
                             )}
                             {quotation.status === 'rejected' && (
-                              <button type="button" className="rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-medium text-white" onClick={() => alert(quotation.rejectionReason || 'No reason was recorded.')}>View reason</button>
+                              <button type="button" className="rounded-lg bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-900 transition" onClick={() => alert(quotation.rejectionReason || 'No reason was recorded.')}>View reason</button>
                             )}
                             {quotation.status === 'converted' && (
-                              <button type="button" className="rounded-lg bg-cravora-purple px-3 py-1.5 text-xs font-medium text-white" onClick={() => openInvoice(quotation.id)}>Open invoice</button>
+                              <button type="button" className="rounded-lg bg-cravora-purple px-2.5 py-1.5 text-xs font-medium text-white hover:bg-cravora-purple-dark transition" onClick={() => openInvoice(quotation.id)}>Open invoice</button>
                             )}
-                            <button type="button" className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Download PDF" onClick={() => handleDownloadQuotation(quotation)}>
+                            <button
+                              type="button"
+                              className="rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 px-2.5 py-1.5 text-xs font-medium text-cravora-purple flex items-center space-x-1 transition shadow-sm"
+                              title="Edit quotation"
+                              onClick={() => handleEditDraft(quotation.id)}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              title="Download PDF"
+                              onClick={() => handleDownloadQuotation(quotation)}
+                            >
                               <Download className="w-4 h-4" />
                             </button>
-                            {quotation.status === 'draft' && (
-                              <button type="button" className="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="Delete" onClick={() => handleDelete(quotation.id)}>
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
+                              title="Delete quotation"
+                              onClick={() => handleDelete(quotation.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </td>
                       </motion.tr>

@@ -1,12 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Download, Save, Settings } from 'lucide-react';
+import { Download, Save, Settings, MessageCircle, Pencil } from 'lucide-react';
 import { useQuotationStore } from '../store/quotationStore';
 import { generatePDF, PDFOptions } from '../utils/pdfGenerator';
 import { apiUrl, apiJson, authHeaders, blobToBase64, publicQuotationUrl } from '../utils/api';
 import { useLayoutEffect, useRef, useState } from 'react';
 import ProgressStepper from '../components/ProgressStepper';
 import PdfDocument from '../components/PdfDocument';
+import WhatsAppModal from '../components/WhatsAppModal';
 function FitSheet({ children }: { children: React.ReactNode }) {
   const frame = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ scale: 1, height: 1123 });
@@ -75,6 +76,41 @@ export default function PdfPreview() {
   });
   const [showSettings, setShowSettings] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [waPdfBase64, setWaPdfBase64] = useState('');
+  const [waNotice, setWaNotice] = useState('');
+
+  const handleOpenWhatsApp = async () => {
+    setIsGenerating(true);
+    try {
+      if (!quotationId) await generateQuotationId();
+      const id = useQuotationStore.getState().quotationId;
+      if (!['sent', 'viewed', 'accepted', 'rejected', 'expired', 'converted'].includes(status)) {
+        await saveDraft();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const blob = await generatePDF('pdf-content', `${id}.pdf`, { ...pdfOptions, download: false });
+      const base64 = await blobToBase64(blob);
+      setWaPdfBase64(base64);
+      setShowWhatsAppModal(true);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not prepare quotation PDF for WhatsApp');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleExplicitIssue = async () => {
+    const id = useQuotationStore.getState().quotationId;
+    const issued = await apiJson(`/api/quotations/${id}/issue`, { method: 'POST' });
+    setLifecycle({
+      status: issued.status,
+      publicToken: issued.publicToken,
+      issuedAt: issued.issuedAt,
+      isDraft: false,
+    });
+    return { publicToken: issued.publicToken };
+  };
 
   const handleDownload = async () => {
     setIsGenerating(true);
@@ -106,6 +142,7 @@ export default function PdfPreview() {
 
       const locked = ['sent', 'viewed', 'accepted', 'rejected', 'expired', 'converted'].includes(status);
       if (locked || issuedAt) {
+        await saveDraft();
         alert('PDF downloaded.');
         return;
       }
@@ -259,11 +296,32 @@ export default function PdfPreview() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
+                onClick={handleOpenWhatsApp}
+                disabled={isGenerating}
+                className="bg-[#25D366] text-white px-4 sm:px-6 py-3 rounded-lg font-medium hover:bg-[#128C7E] transition flex items-center justify-center space-x-2 w-full sm:w-auto disabled:opacity-50"
+              >
+                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-sm sm:text-base">WhatsApp</span>
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={handleSaveDraft}
                 className="bg-gray-600 text-white px-4 sm:px-6 py-3 rounded-lg font-medium hover:bg-gray-700 transition flex items-center justify-center space-x-2 w-full sm:w-auto"
               >
                 <Save className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="text-sm sm:text-base">Save Draft</span>
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => navigate('/summary')}
+                className="bg-purple-100 text-cravora-purple border border-purple-200 px-4 sm:px-6 py-3 rounded-lg font-medium hover:bg-purple-200 transition flex items-center justify-center space-x-2 w-full sm:w-auto"
+              >
+                <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-sm sm:text-base">Edit Details</span>
               </motion.button>
             </div>
 
@@ -358,6 +416,29 @@ export default function PdfPreview() {
           />
           </FitSheet>
         </motion.div>
+
+        {waNotice && (
+          <div className="max-w-5xl mx-auto mt-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm flex items-center justify-between">
+            <span>{waNotice}</span>
+            <button onClick={() => setWaNotice('')} className="text-green-600 hover:text-green-900 font-bold ml-2">×</button>
+          </div>
+        )}
+
+        <WhatsAppModal
+          isOpen={showWhatsAppModal}
+          onClose={() => setShowWhatsAppModal(false)}
+          quotationId={quotationId}
+          initialPhone={clientInfo.clientMobile || ''}
+          clientName={clientInfo.clientName}
+          grandTotal={grandTotal}
+          currency={clientInfo.currency || 'INR'}
+          publicToken={publicToken || ''}
+          isDraft={!['sent', 'viewed', 'accepted', 'rejected', 'expired', 'converted'].includes(status)}
+          pdfBase64={waPdfBase64}
+          filename={`${quotationId || 'Quotation'}.pdf`}
+          onIssueQuotation={handleExplicitIssue}
+          onSuccess={(notice) => setWaNotice(notice)}
+        />
       </div>
     </div>
   );

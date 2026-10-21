@@ -67,6 +67,8 @@ export interface ApiRecord {
   passwordSet?: boolean;
   role?: string;
   duplicate?: boolean;
+  qrCode?: string;
+  isReady?: boolean;
 }
 
 export function authHeaders(init?: HeadersInit) {

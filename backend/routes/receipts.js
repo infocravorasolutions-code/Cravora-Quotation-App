@@ -106,4 +106,17 @@ router.post('/:receiptNumber/email', requireFinance, async (req, res) => {
     }
 });
 
+router.delete('/:receiptNumber', requireFinance, async (req, res) => {
+    try {
+        const receipt = await Receipt.findOne({ receiptNumber: req.params.receiptNumber });
+        if (!receipt) return res.status(404).json({ message: 'Receipt not found' });
+
+        await Receipt.deleteOne({ receiptNumber: req.params.receiptNumber });
+        await logAudit('receipt_deleted', 'receipt', req.params.receiptNumber, {});
+        res.json({ message: `Receipt ${req.params.receiptNumber} deleted successfully` });
+    } catch (err) {
+        res.status(500).json({ message: err.message || 'Could not delete receipt' });
+    }
+});
+
 module.exports = router;

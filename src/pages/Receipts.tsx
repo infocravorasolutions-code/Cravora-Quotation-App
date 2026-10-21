@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ReceiptDocument from '../components/ReceiptDocument';
 import SectionNav from '../components/SectionNav';
+import WhatsAppModal from '../components/WhatsAppModal';
 import { invoiceLinks } from '../utils/labels';
 import { generatePDF } from '../utils/pdfGenerator';
 import { apiJson, asItems, blobToBase64 } from '../utils/api';
@@ -42,12 +43,32 @@ async function suggestReceiptEmail(receipt: ReceiptRecord) {
   return suggested;
 }
 
+async function suggestReceiptPhone(receipt: ReceiptRecord) {
+  let suggested = '';
+  if (receipt.invoiceId) {
+    try {
+      const invoice = await apiJson(`/api/invoices/${receipt.invoiceId}`);
+      if (invoice.clientId) {
+        const client = await apiJson(`/api/clients/${invoice.clientId}`);
+        if (client.mobile) suggested = String(client.mobile).trim();
+      }
+    } catch {
+      // keep empty
+    }
+  }
+  return suggested;
+}
+
 export default function Receipts() {
   const [receipts, setReceipts] = useState<ReceiptRecord[]>([]);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<ReceiptRecord | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [whatsappReceipt, setWhatsappReceipt] = useState<ReceiptRecord | null>(null);
+  const [whatsappPdfBase64, setWhatsappPdfBase64] = useState('');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [isGeneratingWhatsApp, setIsGeneratingWhatsApp] = useState(false);
 
   const load = async () => {
     const data = await apiJson(`/api/receipts?limit=50&q=${encodeURIComponent(query)}`);
@@ -103,6 +124,36 @@ export default function Receipts() {
     }
   };
 
+  const openWhatsApp = async (receipt: ReceiptRecord) => {
+    setError('');
+    setNotice('');
+    setIsGeneratingWhatsApp(true);
+    try {
+      const suggestedPhone = await suggestReceiptPhone(receipt);
+      const blob = await withPdf(receipt, false);
+      if (!blob) throw new Error('Could not build the receipt PDF');
+      const base64 = await blobToBase64(blob);
+      setWhatsappReceipt(receipt);
+      setWhatsappPhone(suggestedPhone);
+      setWhatsappPdfBase64(base64);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not prepare receipt for WhatsApp');
+    } finally {
+      setIsGeneratingWhatsApp(false);
+    }
+  };
+
+  const deleteReceipt = async (receiptNumber: string) => {
+    if (!confirm(`Are you sure you want to delete receipt ${receiptNumber}?`)) return;
+    try {
+      await apiJson(`/api/receipts/${receiptNumber}`, { method: 'DELETE' });
+      setNotice(`Receipt ${receiptNumber} deleted.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete receipt');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-6xl">
@@ -128,8 +179,23 @@ export default function Receipts() {
                   <td>{formatCurrency(receipt.amount || 0, receipt.currency || 'INR')}</td>
                   <td>{formatCurrency(receipt.balanceDue || 0, receipt.currency || 'INR')}</td>
                   <td className="text-right space-x-3">
-                    <button type="button" className="text-blue-600" onClick={() => download(receipt)}>PDF</button>
-                    <button type="button" className="text-cravora-purple" onClick={() => email(receipt)}>Email</button>
+                    <button type="button" className="text-blue-600 hover:underline" onClick={() => download(receipt)}>PDF</button>
+                    <button type="button" className="text-cravora-purple hover:underline" onClick={() => email(receipt)}>Email</button>
+                    <button
+                      type="button"
+                      className="text-emerald-600 font-medium hover:underline disabled:opacity-50"
+                      disabled={isGeneratingWhatsApp}
+                      onClick={() => openWhatsApp(receipt)}
+                    >
+                      WhatsApp
+                    </button>
+                    <button
+                      type="button"
+                      className="text-red-600 hover:underline"
+                      onClick={() => deleteReceipt(receipt.receiptNumber)}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -145,6 +211,22 @@ export default function Receipts() {
           <ReceiptDocument receipt={active} id="receipt-pdf" />
         </div>,
         document.body
+      )}
+      {whatsappReceipt && (
+        <WhatsAppModal
+          isOpen={Boolean(whatsappReceipt)}
+          onClose={() => setWhatsappReceipt(null)}
+          quotationId={whatsappReceipt.receiptNumber}
+          documentType="Receipt"
+          initialPhone={whatsappPhone}
+          clientName={whatsappReceipt.clientSnapshot?.clientName}
+          grandTotal={whatsappReceipt.amount || 0}
+          currency={whatsappReceipt.currency || 'INR'}
+          isDraft={false}
+          pdfBase64={whatsappPdfBase64}
+          filename={`${whatsappReceipt.receiptNumber}.pdf`}
+          onSuccess={(msg) => setNotice(msg)}
+        />
       )}
     </div>
   );

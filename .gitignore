@@ -21,3 +21,8 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.wa_session/
+*.wa_session/
+.open-wa/
+*.open-wa/
+

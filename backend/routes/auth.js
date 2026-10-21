@@ -75,6 +75,63 @@ router.post('/users', requireAuth, async (req, res) => {
     res.status(201).json({ _id: user._id, email: user.email, role: user.role });
 });
 
+router.put('/users/:id', requireAuth, async (req, res) => {
+    if ((req.auth.role || 'admin') !== 'admin') {
+        return res.status(403).json({ message: 'Only an admin can update a user' });
+    }
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (req.body.role) {
+        const allowedRoles = ['admin', 'accounts', 'viewer'];
+        if (!allowedRoles.includes(req.body.role)) {
+            return res.status(400).json({ message: 'Invalid role' });
+        }
+        if (user.role === 'admin' && req.body.role !== 'admin') {
+            const adminCount = await User.countDocuments({ role: 'admin' });
+            if (adminCount <= 1) {
+                return res.status(400).json({ message: 'Cannot demote the only administrator' });
+            }
+        }
+        user.role = req.body.role;
+        await Session.updateMany({ email: user.email }, { role: user.role });
+    }
+
+    if (req.body.password) {
+        const invalid = passwordError(req.body.password);
+        if (invalid) return res.status(400).json({ message: invalid });
+        const { salt, hash } = hashPassword(req.body.password);
+        user.passwordSalt = salt;
+        user.passwordHash = hash;
+    }
+
+    await user.save();
+    res.json({ _id: user._id, email: user.email, role: user.role });
+});
+
+router.delete('/users/:id', requireAuth, async (req, res) => {
+    if ((req.auth.role || 'admin') !== 'admin') {
+        return res.status(403).json({ message: 'Only an admin can delete a user' });
+    }
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (user.email === req.auth.email) {
+        return res.status(400).json({ message: 'You cannot delete your own active user account' });
+    }
+
+    if (user.role === 'admin') {
+        const adminCount = await User.countDocuments({ role: 'admin' });
+        if (adminCount <= 1) {
+            return res.status(400).json({ message: 'Cannot delete the only administrator' });
+        }
+    }
+
+    await User.deleteOne({ _id: user._id });
+    await Session.deleteMany({ email: user.email });
+    res.json({ message: `User ${user.email} deleted successfully` });
+});
+
 router.post('/logout', requireAuth, async (req, res) => {
     await Session.deleteOne({ token: req.auth.token });
     res.json({ message: 'Signed out' });

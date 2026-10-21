@@ -13,6 +13,7 @@ export interface Module {
 export interface ClientInfo {
   clientName: string;
   clientEmail: string;
+  clientMobile?: string;
   projectName: string;
   projectDescription: string;
   currency: 'INR' | 'USD';
@@ -278,7 +279,6 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
 
   saveDraft: async () => {
     const state = get();
-    if (LOCKED_STATUSES.includes(state.status)) return;
     const draftId = state.quotationId || `DRAFT-${Date.now()}`;
 
     const draft = {

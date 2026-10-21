@@ -14,17 +14,36 @@ const reportsRouter = require('./routes/reports');
 const authRouter = require('./routes/auth');
 const settingsRouter = require('./routes/settings');
 const financeRouter = require('./routes/finance');
+const whatsappRouter = require('./routes/whatsapp');
 const { requireAuth } = require('./utils/auth');
 const { safeMessage } = require('./utils/http');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 const corsOriginEnv = process.env.CORS_ORIGIN;
-const corsOrigin = !corsOriginEnv || corsOriginEnv === 'true'
-    ? true
-    : corsOriginEnv.split(',').map((value) => value.trim().replace(/\/+$/, ''));
+const configuredOrigins = corsOriginEnv && corsOriginEnv !== 'true'
+    ? corsOriginEnv.split(',').map((value) => value.trim().replace(/\/+$/, ''))
+    : null;
 
-app.use(cors({ origin: corsOrigin, credentials: true }));
+const corsOriginHandler = (origin, callback) => {
+    if (!origin) return callback(null, true);
+
+    // Always allow local development origins (localhost or 127.0.0.1 on any port)
+    if (
+        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+        /^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+    ) {
+        return callback(null, true);
+    }
+
+    if (!configuredOrigins || configuredOrigins.includes(origin)) {
+        return callback(null, true);
+    }
+
+    callback(null, false);
+};
+
+app.use(cors({ origin: corsOriginHandler, credentials: true }));
 app.use(express.json({ limit: '25mb' }));
 
 app.use('/api/auth', authRouter);
@@ -38,6 +57,7 @@ app.use('/api/audit-logs', requireAuth, auditLogsRouter);
 app.use('/api/reports', requireAuth, reportsRouter);
 app.use('/api/finance', requireAuth, financeRouter);
 app.use('/api/settings', requireAuth, settingsRouter);
+app.use('/api/whatsapp', requireAuth, whatsappRouter);
 
 app.use((err, req, res, next) => {
     console.error(err);
