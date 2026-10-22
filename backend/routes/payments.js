@@ -119,6 +119,19 @@ router.post('/', requireFinance, async (req, res) => {
         });
         await applyPaymentStatus(invoice);
         await invoice.save();
+        await Receipt.updateMany(
+            { invoiceId: invoice.invoiceNumber },
+            {
+                $set: {
+                    invoiceTotal: invoice.grandTotal,
+                    amountPaid: invoice.amountPaid,
+                    balanceDue: invoice.balanceDue,
+                    'issuedSnapshot.invoiceTotal': invoice.grandTotal,
+                    'issuedSnapshot.amountPaid': invoice.amountPaid,
+                    'issuedSnapshot.balanceDue': invoice.balanceDue,
+                }
+            }
+        );
         try {
             const snapshot = invoice.clientSnapshot || {};
             const entry = planClientReceipt({
@@ -157,10 +170,43 @@ router.post('/:id/receipt', requireFinance, async (req, res) => {
         if (!payment || payment.status !== 'recorded') {
             return res.status(404).json({ message: 'Payment not found' });
         }
-        const existing = await Receipt.findOne({ paymentId: payment._id });
-        if (existing) return res.json(existing);
         const invoice = await Invoice.findOne({ invoiceNumber: payment.invoiceId });
         if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+
+        const recordedPayments = await Payment.find({
+            invoiceId: invoice.invoiceNumber,
+            status: 'recorded',
+        }).select('amount').lean();
+        const totalPaid = round2(recordedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0));
+        const balanceDue = round2(Math.max(0, invoice.grandTotal - totalPaid));
+
+        let existing = await Receipt.findOne({ paymentId: payment._id });
+        if (existing) {
+            existing.amount = payment.amount;
+            existing.paymentDate = payment.paymentDate;
+            existing.paymentMethod = payment.paymentMethod;
+            existing.transactionReference = payment.transactionReference || '';
+            existing.invoiceTotal = invoice.grandTotal;
+            existing.amountPaid = totalPaid;
+            existing.balanceDue = balanceDue;
+            existing.issuedSnapshot = {
+                ...(existing.issuedSnapshot || {}),
+                receiptNumber: existing.receiptNumber,
+                invoiceNumber: invoice.invoiceNumber,
+                clientSnapshot: invoice.clientSnapshot || existing.clientSnapshot,
+                amount: payment.amount,
+                paymentDate: payment.paymentDate,
+                paymentMethod: payment.paymentMethod,
+                transactionReference: payment.transactionReference || '',
+                invoiceTotal: invoice.grandTotal,
+                amountPaid: totalPaid,
+                balanceDue: balanceDue,
+                currency: invoice.currency || existing.currency || 'INR',
+            };
+            await existing.save();
+            return res.json(existing);
+        }
+
         const receiptNumber = await nextDocumentNumber('RCP', Receipt, 'receiptNumber');
         const snapshot = {
             receiptNumber,
@@ -169,10 +215,10 @@ router.post('/:id/receipt', requireFinance, async (req, res) => {
             amount: payment.amount,
             paymentDate: payment.paymentDate,
             paymentMethod: payment.paymentMethod,
-            transactionReference: payment.transactionReference,
+            transactionReference: payment.transactionReference || '',
             invoiceTotal: invoice.grandTotal,
-            amountPaid: invoice.amountPaid,
-            balanceDue: invoice.balanceDue,
+            amountPaid: totalPaid,
+            balanceDue: balanceDue,
             currency: invoice.currency,
         };
         const receipt = await Receipt.create({
@@ -237,8 +283,30 @@ router.put('/:id', requireFinance, async (req, res) => {
                             paymentDate: payment.paymentDate,
                             paymentMethod: payment.paymentMethod,
                             transactionReference: payment.transactionReference,
+                            invoiceTotal: invoice.grandTotal,
                             amountPaid: invoice.amountPaid,
                             balanceDue: invoice.balanceDue,
+                            'issuedSnapshot.amount': payment.amount,
+                            'issuedSnapshot.paymentDate': payment.paymentDate,
+                            'issuedSnapshot.paymentMethod': payment.paymentMethod,
+                            'issuedSnapshot.transactionReference': payment.transactionReference,
+                            'issuedSnapshot.invoiceTotal': invoice.grandTotal,
+                            'issuedSnapshot.amountPaid': invoice.amountPaid,
+                            'issuedSnapshot.balanceDue': invoice.balanceDue,
+                        }
+                    }
+                );
+
+                await Receipt.updateMany(
+                    { invoiceId: invoice.invoiceNumber, paymentId: { $ne: payment._id } },
+                    {
+                        $set: {
+                            invoiceTotal: invoice.grandTotal,
+                            amountPaid: invoice.amountPaid,
+                            balanceDue: invoice.balanceDue,
+                            'issuedSnapshot.invoiceTotal': invoice.grandTotal,
+                            'issuedSnapshot.amountPaid': invoice.amountPaid,
+                            'issuedSnapshot.balanceDue': invoice.balanceDue,
                         }
                     }
                 );
@@ -269,6 +337,20 @@ router.delete('/:id', requireFinance, async (req, res) => {
             if (invoice) {
                 await applyPaymentStatus(invoice);
                 await invoice.save();
+
+                await Receipt.updateMany(
+                    { invoiceId: invoice.invoiceNumber },
+                    {
+                        $set: {
+                            invoiceTotal: invoice.grandTotal,
+                            amountPaid: invoice.amountPaid,
+                            balanceDue: invoice.balanceDue,
+                            'issuedSnapshot.invoiceTotal': invoice.grandTotal,
+                            'issuedSnapshot.amountPaid': invoice.amountPaid,
+                            'issuedSnapshot.balanceDue': invoice.balanceDue,
+                        }
+                    }
+                );
             }
         }
 

@@ -174,10 +174,10 @@ export default function Receipts() {
               {receipts.map((receipt) => (
                 <tr key={receipt.receiptNumber} className="border-b">
                   <td className="py-3 font-mono">{receipt.receiptNumber}</td>
-                  <td>{receipt.invoiceId}</td>
+                  <td>{receipt.invoiceId || receipt.invoiceNumber}</td>
                   <td>{receipt.clientSnapshot?.clientName}</td>
                   <td>{formatCurrency(receipt.amount || 0, receipt.currency || 'INR')}</td>
-                  <td>{formatCurrency(receipt.balanceDue || 0, receipt.currency || 'INR')}</td>
+                  <td>{formatCurrency(receipt.balanceDue !== undefined && receipt.balanceDue !== null ? Math.max(0, receipt.balanceDue) : Math.max(0, (receipt.invoiceTotal || 0) - (receipt.amountPaid || receipt.amount || 0)), receipt.currency || 'INR')}</td>
                   <td className="text-right space-x-3">
                     <button type="button" className="text-blue-600 hover:underline" onClick={() => download(receipt)}>PDF</button>
                     <button type="button" className="text-cravora-purple hover:underline" onClick={() => email(receipt)}>Email</button>
