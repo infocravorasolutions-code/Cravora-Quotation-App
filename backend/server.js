@@ -59,6 +59,10 @@ app.use('/api/finance', requireAuth, financeRouter);
 app.use('/api/settings', requireAuth, settingsRouter);
 app.use('/api/whatsapp', requireAuth, whatsappRouter);
 
+app.use((req, res) => {
+    res.status(404).json({ message: `Route ${req.method} ${req.originalUrl} not found` });
+});
+
 app.use((err, req, res, next) => {
     console.error(err);
     if (res.headersSent) return next(err);

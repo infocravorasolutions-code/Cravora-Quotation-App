@@ -86,7 +86,14 @@ export async function apiJson(path: string, options: RequestInit = {}): Promise<
   const url = apiUrl(path);
   const res = await fetch(url, { ...options, headers });
   const text = await res.text();
-  const data = (text ? JSON.parse(text) : {}) as ApiRecord;
+  let data: ApiRecord = {};
+  if (text) {
+    try {
+      data = JSON.parse(text) as ApiRecord;
+    } catch {
+      // Body is not JSON (e.g. Express or Nginx HTML error page)
+    }
+  }
   if (res.status === 401 && !path.startsWith('/api/auth/login') && !path.startsWith('/api/auth/setup')) {
     localStorage.removeItem('cravora.token');
     if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/public')) {
@@ -94,7 +101,7 @@ export async function apiJson(path: string, options: RequestInit = {}): Promise<
     }
   }
   if (!res.ok) {
-    throw new Error(data.message || 'Request failed');
+    throw new Error(data.message || `Request failed with status ${res.status}${res.statusText ? ` (${res.statusText})` : ''}`);
   }
   return data;
 }
