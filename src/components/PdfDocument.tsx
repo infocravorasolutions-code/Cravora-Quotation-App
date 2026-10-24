@@ -212,16 +212,20 @@ export default function PdfDocument(props: PdfDocumentProps) {
             <div style={{ marginLeft: 'auto', width: '78mm', paddingTop: '2mm' }}>
                 <TotalLine label="Sub Total" value={money(props.subtotal)} />
                 {props.discountRate > 0 && <TotalLine label={`Discount (${props.discountRate}%)`} value={`- ${money(props.discountAmount)}`} />}
-                {props.gstDetails && (props.gstDetails.totalGstAmount || 0) > 0 ? (
-                    props.gstDetails.gstType === 'inter' ? (
-                        <TotalLine label={`IGST (${props.gstDetails.igstRate}%)`} value={money(props.gstDetails.igstAmount || 0)} />
-                    ) : (
-                        <>
-                            <TotalLine label={`CGST (${props.gstDetails.cgstRate}%)`} value={money(props.gstDetails.cgstAmount || 0)} />
-                            <TotalLine label={`SGST (${props.gstDetails.sgstRate}%)`} value={money(props.gstDetails.sgstAmount || 0)} />
-                        </>
-                    )
-                ) : props.taxAmount > 0 ? <TotalLine label={`Tax (${props.tax}%)`} value={money(props.taxAmount)} /> : null}
+                {props.gstDetails && typeof props.gstDetails === 'object' && Object.keys(props.gstDetails).length > 0 ? (
+                    (props.gstDetails.totalGstAmount || 0) > 0 ? (
+                        props.gstDetails.gstType === 'inter' ? (
+                            <TotalLine label={`IGST (${props.gstDetails.igstRate}%)`} value={money(props.gstDetails.igstAmount || 0)} />
+                        ) : (
+                            <>
+                                <TotalLine label={`CGST (${props.gstDetails.cgstRate}%)`} value={money(props.gstDetails.cgstAmount || 0)} />
+                                <TotalLine label={`SGST (${props.gstDetails.sgstRate}%)`} value={money(props.gstDetails.sgstAmount || 0)} />
+                            </>
+                        )
+                    ) : null
+                ) : props.taxAmount > 0 ? (
+                    <TotalLine label={`Tax (${props.tax}%)`} value={money(props.taxAmount)} />
+                ) : null}
             </div>
             <div style={{ marginTop: '3mm', marginLeft: 'auto', width: '118mm', background: SOFT, borderRadius: '12px', padding: '3mm 4mm' }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>

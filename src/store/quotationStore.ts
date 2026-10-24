@@ -170,7 +170,7 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
   setValidUntil: (validUntil) => set({ validUntil }),
   setLifecycle: (fields) => set(fields),
 
-  setGstDetails: (gst) => set({ gstDetails: gst }),
+  setGstDetails: (gst) => set({ gstDetails: gst, tax: gst.gstRate ?? 0 }),
 
   updateGstAmounts: () => {
     const state = get();
@@ -187,6 +187,7 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
       const totalGst = cgstAmount + sgstAmount;
 
       set({
+        tax: gst.gstRate ?? (gst.cgstRate + gst.sgstRate),
         gstDetails: {
           ...gst,
           cgstAmount,
@@ -199,6 +200,7 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
       const igstAmount = (taxableAmount * gst.igstRate) / 100;
 
       set({
+        tax: gst.gstRate ?? gst.igstRate,
         gstDetails: {
           ...gst,
           igstAmount,
@@ -221,9 +223,12 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
 
   getTaxAmount: () => {
     const state = get();
+    if (state.gstDetails && typeof state.gstDetails.gstRate === 'number') {
+      return state.getGstAmount();
+    }
     const subtotal = state.getSubtotal();
     const discount = state.getDiscountAmount();
-    return ((subtotal - discount) * state.tax) / 100;
+    return ((subtotal - discount) * (state.tax || 0)) / 100;
   },
 
   getGstAmount: () => {

@@ -4,7 +4,7 @@ import { Receipt } from 'lucide-react';
 import { useQuotationStore, GSTDetails } from '../store/quotationStore';
 
 export default function GSTConfiguration() {
-  const { clientInfo, gstDetails, setClientInfo, setGstDetails } = useQuotationStore();
+  const { clientInfo, gstDetails, setClientInfo, setGstDetails, setTax } = useQuotationStore();
   const [showGstConfig, setShowGstConfig] = useState(false);
 
   const gstRates = [
@@ -35,6 +35,7 @@ export default function GSTConfiguration() {
       igstRate: gstDetails.gstType === 'inter' ? rate : 0,
     };
     setGstDetails(newGstDetails);
+    setTax(rate);
   };
 
   return (
