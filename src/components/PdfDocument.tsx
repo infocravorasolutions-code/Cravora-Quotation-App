@@ -25,6 +25,8 @@ interface PdfDocumentProps {
     balanceDue?: number;
     dueDate?: string | null;
     includeSignature?: boolean;
+    /** When false, hides Scan to Pay / bank details on the PDF. Default true. */
+    showPaymentDetails?: boolean;
 }
 
 const PURPLE = '#6D4AFF';
@@ -152,6 +154,7 @@ function safeDate(value: string | null | undefined, pattern: string) {
 export default function PdfDocument(props: PdfDocumentProps) {
     const logo = useClearLogo('/logo-header.png');
     const isInvoice = props.documentType === 'Billing' || props.documentType === 'Invoice';
+    const showPaymentDetails = props.showPaymentDetails !== false;
     const currency = props.clientInfo?.currency === 'USD' ? 'USD' : 'INR';
     const money = (amount: number) => formatCurrency(amount || 0, currency);
     const rateLabel = currency === 'USD' ? 'Rate ($)' : 'Rate (₹)';
@@ -205,7 +208,7 @@ export default function PdfDocument(props: PdfDocumentProps) {
             return;
         }
         setPages((current) => JSON.stringify(current) === JSON.stringify(next.pages) ? current : next.pages);
-    }, [lines, terms, logo, isInvoice, props.grandTotal, props.clientInfo, props.quotationId, props.discountRate, props.amountPaid, compact, signature]);
+    }, [lines, terms, logo, isInvoice, showPaymentDetails, props.grandTotal, props.clientInfo, props.quotationId, props.discountRate, props.amountPaid, compact, signature]);
 
     const renderClosing = () => (
         <>
@@ -243,10 +246,16 @@ export default function PdfDocument(props: PdfDocumentProps) {
                     <TotalLine label="Balance due" value={money(props.balanceDue || 0)} />
                 </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4mm', marginTop: '4mm' }}>
-                {isInvoice ? <PaymentCard /> : <TermsCard terms={terms} />}
-                {isInvoice ? <TermsCard terms={terms} /> : <PaymentCard />}
-            </div>
+            {showPaymentDetails ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4mm', marginTop: '4mm' }}>
+                    {isInvoice ? <PaymentCard /> : <TermsCard terms={terms} />}
+                    {isInvoice ? <TermsCard terms={terms} /> : <PaymentCard />}
+                </div>
+            ) : (
+                <div style={{ marginTop: '4mm' }}>
+                    <TermsCard terms={terms} />
+                </div>
+            )}
             <Footer invoice={isInvoice} signature={props.includeSignature} />
         </>
     );
@@ -444,6 +453,7 @@ function BillTo({ clientInfo, invoice }: { clientInfo: any; invoice: boolean }) 
             <div style={{ marginTop: '2mm', fontSize: '16px', fontWeight: 800, textTransform: 'uppercase', lineHeight: 1.3, wordBreak: 'normal', overflowWrap: 'break-word' }}>{clipText(clientInfo?.clientName, 80)}</div>
             {clientInfo?.clientAddress ? <div style={{ marginTop: '1.5mm', fontSize: '11px', color: '#4b5160', lineHeight: 1.45, wordBreak: 'normal', overflowWrap: 'break-word' }}>{clipText(clientInfo.clientAddress, 160)}</div> : null}
             {clientInfo?.clientGstNumber ? <div style={{ marginTop: '2mm', fontSize: '11px', fontWeight: 700 }}>GSTIN <span style={{ fontWeight: 500 }}> : {clientInfo.clientGstNumber}</span></div> : null}
+            {clientInfo?.lutNumber ? <div style={{ marginTop: '1.5mm', fontSize: '11px', fontWeight: 700 }}>LUT No. <span style={{ fontWeight: 500 }}> : {clientInfo.lutNumber}</span></div> : null}
         </div>
     );
 }

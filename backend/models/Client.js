@@ -6,6 +6,7 @@ const ClientSchema = new mongoose.Schema({
     email: { type: String, required: true, trim: true, lowercase: true },
     mobile: { type: String, default: '', trim: true },
     gstin: { type: String, default: '', trim: true, uppercase: true },
+    lutNumber: { type: String, default: '', trim: true },
     billingAddress: { type: String, default: '' },
     shippingAddress: { type: String, default: '' },
     website: { type: String, default: '' },

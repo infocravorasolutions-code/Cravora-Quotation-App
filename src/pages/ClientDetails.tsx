@@ -12,7 +12,7 @@ export default function ClientDetails() {
   const { clientInfo, setClientInfo, generateQuotationId, saveDraft, clientId, setClientId, quotationId } = useQuotationStore();
 
   const [formData, setFormData] = useState(clientInfo);
-  const [clients, setClients] = useState<Array<{ _id: string; companyName: string; email: string; mobile?: string; gstin?: string; billingAddress?: string; shippingAddress?: string }>>([]);
+  const [clients, setClients] = useState<Array<{ _id: string; companyName: string; email: string; mobile?: string; gstin?: string; lutNumber?: string; billingAddress?: string; shippingAddress?: string }>>([]);
 
   // Auto-save functionality
   useAutoSave(30000); // Auto-save every 30 seconds
@@ -44,6 +44,7 @@ export default function ClientDetails() {
       clientMobile: client.mobile || '',
       clientAddress: client.billingAddress || '',
       clientGstNumber: client.gstin || '',
+      lutNumber: client.lutNumber || '',
       shippingAddress: client.shippingAddress || '',
     }));
   };
@@ -322,6 +323,23 @@ export default function ClientDetails() {
                     <option value="Fixed">Fixed</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                  LUT Number {formData.currency === 'USD' ? '(recommended for foreign clients)' : '(optional)'}
+                </label>
+                <input
+                  type="text"
+                  name="lutNumber"
+                  value={formData.lutNumber || ''}
+                  onChange={handleChange}
+                  className="w-full px-2 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm sm:text-base"
+                  placeholder="e.g. ADXXXXXXXYYZZZZZ"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Use when billing a foreign client under Letter of Undertaking (export of services). Leave blank if not applicable.
+                </p>
               </div>
 
               <motion.button

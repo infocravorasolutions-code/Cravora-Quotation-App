@@ -20,6 +20,7 @@ function publicQuotation(doc) {
         taxAmount: source.taxAmount,
         grandTotal: source.grandTotal,
         notes: source.notes || '',
+        showPaymentDetails: source.showPaymentDetails !== false,
         validUntil: source.validUntil || null,
         issuedAt: source.issuedAt || doc.issuedAt,
         acceptedAt: doc.acceptedAt || null,

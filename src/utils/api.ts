@@ -42,7 +42,9 @@ export interface ApiRecord {
   _id?: string;
   companyName?: string;
   email?: string;
+  mobile?: string;
   gstin?: string;
+  lutNumber?: string;
   billingAddress?: string;
   shippingAddress?: string;
   quotations?: Record<string, number>;

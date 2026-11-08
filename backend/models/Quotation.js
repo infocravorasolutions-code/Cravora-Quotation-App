@@ -44,18 +44,22 @@ const QuotationSchema = new mongoose.Schema({
         pricingType: String,
         gstNumber: String,
         clientGstNumber: String,
+        lutNumber: String,
         clientAddress: String,
         companyAddress: String,
         companyPan: String,
         clientPan: String,
         placeOfSupply: String,
-        countryOfSupply: String
+        countryOfSupply: String,
+        shippingAddress: String,
+        clientMobile: String,
     },
 
     modules: [ModuleSchema],
 
     tax: { type: Number, default: 18 },
     discountRate: { type: Number, default: 0 },
+    showPaymentDetails: { type: Boolean, default: true },
     termsAndConditions: [String],
 
     gstDetails: {

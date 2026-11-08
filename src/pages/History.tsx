@@ -44,6 +44,7 @@ interface SavedQuotation {
   subtotal: number;
   taxAmount: number;
   grandTotal: number;
+  showPaymentDetails?: boolean;
 }
 
 export default function History() {
@@ -120,6 +121,10 @@ export default function History() {
           subtotal: q.subtotal || 0,
           taxAmount: q.taxAmount || 0,
           grandTotal: q.grandTotal || 0,
+          showPaymentDetails: (
+            (q.issuedSnapshot as { showPaymentDetails?: boolean } | undefined)?.showPaymentDetails
+            ?? (q as { showPaymentDetails?: boolean }).showPaymentDetails
+          ) !== false,
         }));
         setQuotations(mapped);
       }
@@ -465,6 +470,7 @@ export default function History() {
               validUntil={generatingPdfFor.validUntil}
               notes={generatingPdfFor.notes}
               gstDetails={generatingPdfFor.gstDetails}
+              showPaymentDetails={generatingPdfFor.showPaymentDetails !== false}
               id="hidden-pdf-content-inner"
             />
           </div>

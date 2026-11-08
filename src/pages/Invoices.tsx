@@ -74,6 +74,7 @@ export default function Invoices() {
   const [isGeneratingWhatsApp, setIsGeneratingWhatsApp] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceRecord | null>(null);
   const [editForm, setEditForm] = useState({ dueDate: '', notes: '', discountRate: 0, terms: '' });
+  const [showPaymentDetails, setShowPaymentDetails] = useState(true);
 
   const load = async () => {
     const data = await apiJson(`/api/invoices?limit=50&q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`);
@@ -291,6 +292,15 @@ export default function Invoices() {
             >
               Apply
             </button>
+            <label className="flex items-center gap-2 text-sm text-gray-700 sm:ml-auto">
+              <input
+                type="checkbox"
+                checked={showPaymentDetails}
+                onChange={(e) => setShowPaymentDetails(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-cravora-purple focus:ring-cravora-purple"
+              />
+              Scan to Pay on PDF
+            </label>
           </div>
           {error && <p className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
           {invoices.length === 0 ? (
@@ -410,6 +420,7 @@ export default function Invoices() {
             gstDetails={preview.source.gstDetails}
             amountPaid={preview.amountPaid || 0}
             balanceDue={preview.balanceDue || 0}
+            showPaymentDetails={showPaymentDetails}
           />
         </div>,
         document.body

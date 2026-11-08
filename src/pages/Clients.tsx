@@ -8,6 +8,7 @@ interface ClientRecord {
   email: string;
   mobile: string;
   gstin: string;
+  lutNumber?: string;
   billingAddress: string;
   shippingAddress: string;
   website: string;
@@ -20,6 +21,7 @@ const emptyClient = {
   email: '',
   mobile: '',
   gstin: '',
+  lutNumber: '',
   billingAddress: '',
   shippingAddress: '',
   website: '',
@@ -86,7 +88,8 @@ export default function Clients() {
             <input name="contactPerson" value={form.contactPerson} onChange={handleChange} placeholder="Contact person" className="border rounded-lg px-3 py-2" />
             <input name="email" type="email" value={form.email} onChange={handleChange} required placeholder="Email" className="border rounded-lg px-3 py-2" />
             <input name="mobile" value={form.mobile} onChange={handleChange} placeholder="Mobile" className="border rounded-lg px-3 py-2" />
-            <input name="gstin" value={form.gstin} onChange={handleChange} placeholder="GSTIN" className="border rounded-lg px-3 py-2" />
+            <input name="gstin" value={form.gstin} onChange={handleChange} placeholder="GSTIN (Indian clients)" className="border rounded-lg px-3 py-2" />
+            <input name="lutNumber" value={form.lutNumber} onChange={handleChange} placeholder="LUT number (optional, foreign/export)" className="border rounded-lg px-3 py-2" />
             <input name="website" value={form.website} onChange={handleChange} placeholder="Website" className="border rounded-lg px-3 py-2" />
             <textarea name="billingAddress" value={form.billingAddress} onChange={handleChange} placeholder="Billing address" className="border rounded-lg px-3 py-2" />
             <textarea name="shippingAddress" value={form.shippingAddress} onChange={handleChange} placeholder="Shipping address" className="border rounded-lg px-3 py-2" />
@@ -112,6 +115,7 @@ export default function Clients() {
                   <th>Email</th>
                   <th>Mobile</th>
                   <th>GSTIN</th>
+                  <th>LUT</th>
                   <th></th>
                 </tr>
               </thead>
@@ -122,6 +126,7 @@ export default function Clients() {
                     <td>{client.email}</td>
                     <td>{client.mobile}</td>
                     <td>{client.gstin}</td>
+                    <td>{client.lutNumber || '—'}</td>
                     <td className="text-right space-x-2">
                       <button className="text-cravora-purple" onClick={() => { setEditingId(client._id); setForm({ ...emptyClient, ...client }); }}>Edit</button>
                       <button className="text-red-600" onClick={() => handleDelete(client._id)}>Delete</button>

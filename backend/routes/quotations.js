@@ -74,6 +74,7 @@ function buildSnapshot(doc, totals) {
         taxAmount: totals.taxAmount,
         grandTotal: totals.grandTotal,
         notes: doc.notes || '',
+        showPaymentDetails: doc.showPaymentDetails !== false,
         validUntil: doc.validUntil || null,
         issuedAt: new Date().toISOString(),
     };

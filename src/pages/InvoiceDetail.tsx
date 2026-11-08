@@ -93,6 +93,7 @@ export default function InvoiceDetail() {
   const [invoiceEditForm, setInvoiceEditForm] = useState({ dueDate: '', notes: '', discountRate: 0, terms: '' });
   const [editingPayment, setEditingPayment] = useState<PaymentRow | null>(null);
   const [paymentEditForm, setPaymentEditForm] = useState({ amount: '', paymentDate: '', paymentMethod: 'bank_transfer', transactionReference: '', notes: '' });
+  const [showPaymentDetails, setShowPaymentDetails] = useState(true);
 
   const load = async () => {
     const [invoiceData, paymentData, receiptData, accountData] = await Promise.all([
@@ -435,7 +436,16 @@ export default function InvoiceDetail() {
                 <p>Received<br /><span className="font-medium">{formatCurrency(invoice.amountPaid || 0, currency)}</span></p>
                 <p>Remaining<br /><span className="font-medium">{formatCurrency(invoice.balanceDue || 0, currency)}</span></p>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <label className="mt-4 flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={showPaymentDetails}
+                  onChange={(e) => setShowPaymentDetails(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-cravora-purple focus:ring-cravora-purple"
+                />
+                Include Scan to Pay / bank details on PDF
+              </label>
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" className="rounded-lg border px-3 py-2 text-sm hover:bg-gray-50" onClick={() => download().catch((err: Error) => setError(err.message))}>Download PDF</button>
                 <button type="button" className="rounded-lg border px-3 py-2 text-sm hover:bg-gray-50" onClick={email}>Email invoice</button>
                 <button
@@ -567,6 +577,7 @@ export default function InvoiceDetail() {
             gstDetails={preview.gstDetails}
             amountPaid={invoice?.amountPaid || 0}
             balanceDue={invoice?.balanceDue || 0}
+            showPaymentDetails={showPaymentDetails}
           />
         </div>,
         document.body

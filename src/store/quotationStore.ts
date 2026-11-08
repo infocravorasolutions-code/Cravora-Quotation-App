@@ -20,6 +20,7 @@ export interface ClientInfo {
   pricingType: 'Hourly' | 'Fixed';
   gstNumber?: string;
   clientGstNumber?: string;
+  lutNumber?: string;
   clientAddress?: string;
   companyAddress?: string;
   companyPan?: string;
@@ -60,6 +61,8 @@ export interface QuotationState {
   setTermsAndConditions: (terms: string[]) => void;
   documentType: 'Quotation' | 'Billing';
   setDocumentType: (type: 'Quotation' | 'Billing') => void;
+  showPaymentDetails: boolean;
+  setShowPaymentDetails: (show: boolean) => void;
   clientId: string;
   status: string;
   notes: string;
@@ -94,6 +97,7 @@ const initialClientInfo: ClientInfo = {
   pricingType: 'Hourly',
   gstNumber: '',
   clientGstNumber: '',
+  lutNumber: '',
   clientAddress: '',
   companyAddress: '',
   companyPan: '',
@@ -132,6 +136,7 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
 
   ],
   documentType: 'Quotation',
+  showPaymentDetails: true,
   gstDetails: initialGstDetails,
   quotationId: '',
   isDraft: true,
@@ -144,6 +149,7 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
   issuedAt: null,
 
   setClientInfo: (info) => set({ clientInfo: info }),
+  setShowPaymentDetails: (showPaymentDetails) => set({ showPaymentDetails }),
 
   addModule: (module) =>
     set((state) => ({ modules: [...state.modules, module] })),
@@ -295,6 +301,7 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
       discountRate: state.discountRate,
       termsAndConditions: state.termsAndConditions,
       documentType: state.documentType,
+      showPaymentDetails: state.showPaymentDetails !== false,
       gstDetails: state.gstDetails,
       notes: state.notes,
       validUntil: state.validUntil || undefined,
@@ -351,6 +358,7 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
             'Please quote invoice number when remitting funds.'
           ],
           documentType: draft.documentType || 'Quotation',
+          showPaymentDetails: draft.showPaymentDetails !== false,
           gstDetails: draft.gstDetails || state.gstDetails,
           quotationId: draft.quotationId,
           isDraft: draft.isDraft !== undefined ? draft.isDraft : true,
@@ -385,6 +393,7 @@ export const useQuotationStore = create<QuotationState>((set, get) => ({
         'Please quote invoice number when remitting funds.'
       ],
       documentType: 'Quotation',
+      showPaymentDetails: true,
       gstDetails: initialGstDetails,
       quotationId: '',
       isDraft: true,

@@ -20,6 +20,7 @@ function clientPayload(body) {
         email: String(body.email || '').trim(),
         mobile: String(body.mobile || '').trim(),
         gstin: String(body.gstin || '').trim().toUpperCase(),
+        lutNumber: String(body.lutNumber || '').trim(),
         billingAddress: String(body.billingAddress || ''),
         shippingAddress: String(body.shippingAddress || ''),
         website: String(body.website || '').trim(),

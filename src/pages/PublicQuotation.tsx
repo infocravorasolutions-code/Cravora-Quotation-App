@@ -30,6 +30,7 @@ export default function PublicQuotation() {
     taxAmount?: number;
     grandTotal?: number;
     notes?: string;
+    showPaymentDetails?: boolean;
     validUntil?: string | null;
     issuedAt?: string | null;
     rejectionReason?: string;
@@ -117,6 +118,7 @@ export default function PublicQuotation() {
         validUntil={quotation.validUntil}
         notes={quotation.notes}
         gstDetails={quotation.gstDetails}
+        showPaymentDetails={quotation.showPaymentDetails !== false}
       />
     </div>
   );
